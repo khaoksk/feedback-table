@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Responses — Simplesat Feedback</title>
+    <style>
+        body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; margin: 2rem; color: #222; }
+        h1 { font-size: 1.4rem; }
+        p.muted { color: #999; }
+        table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+        th, td { border: 1px solid #ddd; padding: 0.5rem 0.75rem; text-align: left; font-size: 0.9rem; }
+        th { background: #f5f5f5; }
+        tr:nth-child(even) { background: #fafafa; }
+    </style>
+</head>
+<body>
+    <h1>Survey responses</h1>
+    <p class="muted">{{ rows|length }} response(s)</p>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Customer</th>
+                <th>Survey</th>
+                <th>Ticket</th>
+                <th>Ratings</th>
+                <th>Submitted</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>{{ row.response.id }}</td>
+                <td>{{ row.response.customer.name }}</td>
+                <td>{{ row.response.survey.name }}</td>
+                <td>{{ row.ticket_subject }}</td>
+                <td>{{ row.ratings|join:", " }}</td>
+                <td>{{ row.response.submitted_at }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

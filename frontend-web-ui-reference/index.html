@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Feedback responses — reference build</title>
+<style>
+  :root{
+    --bg:#F6F7F5; --surface:#FFFFFF; --border:#E3E1DA; --border-strong:#CFCDC4;
+    --text:#21201C; --text-secondary:#6E6C64; --text-muted:#9B988D;
+    --accent:#0F6E56; --accent-soft:#E1F5EE;
+    --green-bg:#E3F5E8; --green-text:#1F7A3D;
+    --amber-bg:#FDF1DA; --amber-text:#92600A;
+    --red-bg:#FBE7E7; --red-text:#9C2B2B;
+    --gray-bg:#EEEDE9; --gray-text:#6E6C64;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;}
+  .page{max-width:1240px;margin:0 auto;padding:32px 24px 64px;}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:8px;}
+  h1{font-size:20px;font-weight:500;margin:0 0 4px;}
+  .subtitle{margin:0;color:var(--text-secondary);font-size:13px;}
+  .structure-note{margin:10px 0 18px;color:var(--text-muted);font-size:12.5px;}
+  .tabs{display:flex;gap:2px;border-bottom:0.5px solid var(--border-strong);margin-bottom:18px;overflow-x:auto;}
+  .tab{padding:9px 14px;font-size:13px;color:var(--text-secondary);background:none;border:none;border-bottom:2px solid transparent;
+    cursor:pointer;white-space:nowrap;margin-bottom:-1px;}
+  .tab:hover{color:var(--text);}
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:500;}
+  .tab-caption{font-size:13px;color:var(--text-secondary);margin:0 0 14px;padding:10px 12px;background:var(--accent-soft);
+    border-radius:8px;}
+
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px;}
+  .toolbar input[type=search], .toolbar select{
+    height:34px;border:0.5px solid var(--border-strong);border-radius:8px;background:var(--surface);
+    padding:0 10px;font-size:13px;color:var(--text);
+  }
+  .toolbar input[type=search]{width:220px;}
+  .toolbar input[type=search]:focus, .toolbar select:focus{outline:2px solid var(--accent);outline-offset:1px;}
+  .rating-chips{display:flex;gap:6px;}
+  .rchip{height:34px;padding:0 12px;border-radius:8px;border:0.5px solid var(--border-strong);background:var(--surface);font-size:13px;cursor:pointer;color:var(--text-secondary);}
+  .rchip.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .checkbox-label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);white-space:nowrap;}
+
+  .count{font-size:12px;color:var(--text-muted);margin-bottom:8px;}
+
+  .table-wrap{overflow-x:auto;border:0.5px solid var(--border);border-radius:10px;background:var(--surface);}
+  table{width:100%;border-collapse:collapse;min-width:1020px;}
+  thead th{
+    text-align:left;padding:10px 12px;font-weight:500;font-size:12px;color:var(--text-secondary);
+    border-bottom:0.5px solid var(--border-strong);background:#FAFAF8;white-space:nowrap;
+  }
+  th.sortable{cursor:pointer;user-select:none;}
+  th.sortable .arrow{font-size:10px;margin-left:4px;color:var(--text-muted);}
+  tbody td{padding:10px 12px;border-bottom:0.5px solid var(--border);vertical-align:top;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:#FBFBFA;}
+  .company{color:var(--text-muted);font-size:12px;}
+  .ticket{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;}
+  .ticket-none{color:var(--text-muted);font-style:italic;font-size:12.5px;}
+
+  .qcell{min-width:190px;}
+  .qtext{display:block;color:var(--text-secondary);font-size:12px;margin-bottom:4px;}
+  .qtype{color:var(--text-muted);font-size:11px;margin-left:4px;}
+  .qcell-blank{color:var(--text-muted);font-size:12px;font-style:italic;}
+
+  .badge{display:inline-block;padding:2px 9px;border-radius:6px;font-weight:500;font-size:12.5px;}
+  .badge.green{background:var(--green-bg);color:var(--green-text);}
+  .badge.amber{background:var(--amber-bg);color:var(--amber-text);}
+  .badge.red{background:var(--red-bg);color:var(--red-text);}
+  .badge.gray{background:var(--gray-bg);color:var(--gray-text);}
+  .edited-tag{margin-left:6px;font-size:11px;color:var(--text-muted);cursor:help;border-bottom:1px dotted var(--text-muted);}
+
+  .chip{display:inline-block;background:var(--gray-bg);color:var(--text);border:0.5px solid var(--border-strong);
+    padding:2px 8px;border-radius:6px;font-size:12px;margin:1px 4px 1px 0;}
+  .chip.removed{background:transparent;border-style:dashed;color:var(--text-muted);font-style:italic;}
+
+  .comment{color:var(--text);}
+
+  .hidden-col{display:none;}
+
+  @media (max-width:720px){
+    .toolbar input[type=search]{width:100%;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="topbar">
+    <div class="titleblock">
+      <h1>The feedback table feature</h1>
+      <p class="subtitle">Baseline is the seed state, before any backlog work. Each numbered tab shows the same page after that item is built.</p>
+    </div>
+  </div>
+
+  <p class="structure-note">One row per response. Columns are fixed per question, up to the highest question order across all surveys (Q1, Q2, …); a question that wasn't shown or wasn't answered renders as a blank cell rather than its own row.</p>
+
+  <div class="tabs" id="tabs"></div>
+
+  <p class="tab-caption" id="tabCaption"></p>
+
+  <div class="toolbar" id="toolbar">
+    <input type="search" id="searchInput" placeholder="Search customer or company">
+    <select id="surveyFilter">
+      <option value="all">All surveys</option>
+      <option value="s1">Post-ticket CSAT</option>
+      <option value="s2">Onboarding pulse</option>
+    </select>
+    <div class="rating-chips" id="ratingChips">
+      <button class="rchip active" data-val="all">All ratings</button>
+      <button class="rchip" data-val="5">5</button>
+      <button class="rchip" data-val="4">4</button>
+      <button class="rchip" data-val="3">3</button>
+      <button class="rchip" data-val="2">2</button>
+      <button class="rchip" data-val="1">1</button>
+    </div>
+    <label class="checkbox-label"><input type="checkbox" id="ticketlessOnly"> Ticket-less only</label>
+  </div>
+
+  <div class="count" id="countLabel"></div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="sortable" id="sortCreated">Created <span class="arrow">▼</span></th>
+          <th>Customer</th>
+          <th>Company</th>
+          <th>Ticket</th>
+          <th>Survey</th>
+          <th title="Question 1 — wording is fixed per survey">Q1</th>
+          <th id="q2Header" title="Question 2 — wording is fixed per survey; blank if hidden or unanswered">Q2</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+const DEFAULT_LABELS = {1:'Terrible',2:'Bad',3:'Okay',4:'Good',5:'Great'};
+
+function evaluateCondition(value, op, threshold){
+  switch(op){
+    case '>': return value > threshold;
+    case '>=': return value >= threshold;
+    case '<': return value < threshold;
+    case '<=': return value <= threshold;
+    case '==': return value === threshold;
+    default: return false;
+  }
+}
+function labelFor(survey, score){
+  const map = survey.labelMap || DEFAULT_LABELS;
+  return map.hasOwnProperty(score) ? map[score] : 'Unrated';
+}
+function badgeClass(score){
+  if(score >= 4) return 'green';
+  if(score === 3) return 'amber';
+  if(score >= 1) return 'red';
+  return 'gray';
+}
+function cellAnswerHtml(survey, question, value, removedOptions){
+  if(question.type === 'rating'){
+    return `<span class="badge ${badgeClass(value)}">${value} · ${labelFor(survey, value)}</span>`;
+  }
+  if(question.type === 'comment'){
+    return `<span class="comment">"${value}"</span>`;
+  }
+  if(question.type === 'multiselect'){
+    return (value||[]).map(v => {
+      const removed = (removedOptions||[]).includes(v);
+      return `<span class="chip${removed?' removed':''}" title="${removed?'Option removed from current survey settings':''}">${v}</span>`;
+    }).join('');
+  }
+  return '';
+}
+
+// ---------------------------------------------------------------------
+// BASELINE — the seed state. Two rating-only surveys, default labels,
+// no candidate work applied yet. No backlog tags are ever attached here.
+// ---------------------------------------------------------------------
+const BASELINE_SURVEYS = {
+  s1: {
+    id:'s1', name:'Post-ticket CSAT', labelMap:null,
+    questions:{
+      q1:{id:'q1', order:1, type:'rating', text:'How did we do?'},
+      q2:{id:'q2', order:2, type:'rating', text:'How satisfied were you with the resolution?'}
+    }
+  },
+  s2: {
+    id:'s2', name:'Onboarding pulse', labelMap:null,
+    questions:{
+      q1:{id:'q1', order:1, type:'rating', text:'How would you rate onboarding?'},
+      q2:{id:'q2', order:2, type:'rating', text:'How clear were the next steps?'}
+    }
+  }
+};
+
+const BASELINE_RESPONSES = [
+  {id:1, created:'2026-06-29', customer:{name:'Maya Chen',company:'Acme'}, ticket:{id:1201,subject:'Login issues'}, survey:'s1', q1:4, q2:4},
+  {id:2, created:'2026-06-29', customer:{name:'',company:''}, ticket:null, survey:'s1', q1:4, q2:5},
+  {id:3, created:'2026-06-28', customer:{name:'Jordan Reyes',company:'Acme'}, ticket:{id:1198,subject:'Billing question'}, survey:'s1', q1:2, q2:3},
+  {id:4, created:'2026-06-28', customer:{name:'Priya Nair',company:'Globex'}, ticket:null, survey:'s2', q1:5, q2:4},
+  {id:5, created:'2026-06-27', customer:{name:'Sam Okafor',company:'Initech'}, ticket:{id:1184,subject:'Feature request'}, survey:'s2', q1:4, q2:4},
+  {id:6, created:'2026-06-27', customer:{name:'Test User',company:'Acme'}, ticket:{id:1180,subject:'Support chat'}, survey:'s1', q1:4, q2:5},
+  {id:7, created:'2026-06-26', customer:{name:'Tester Customer',company:'Acme'}, ticket:{id:1177,subject:'Password reset'}, survey:'s1', q1:3, q2:0, legacyQ2:true},
+  {id:8, created:'2026-06-26', customer:{name:'gam',company:'kon test wp'}, ticket:null, survey:'s1', q1:3, q2:3},
+  {id:9, created:'2026-06-25', customer:{name:'Lars Berg',company:''}, ticket:{id:1170,subject:'Onboarding call'}, survey:'s2', q1:2, q2:2},
+  {id:10, created:'2026-06-25', customer:{name:'Nadia Popescu',company:'Globex'}, ticket:{id:1166,subject:'API integration'}, survey:'s1', q1:5, q2:5},
+  {id:11, created:'2026-06-24', customer:{name:'Test User',company:'Acme'}, ticket:{id:1160,subject:'Data export'}, survey:'s2', q1:4},
+  {id:12, created:'2026-06-24', customer:{name:'Tester Customer',company:'Acme'}, ticket:{id:1157,subject:'Refund request'}, survey:'s1', q1:1, q2:2},
+  {id:13, created:'2026-06-23', customer:{name:'Priya Nair',company:'Globex'}, ticket:{id:1153,subject:'Refund follow-up'}, survey:'s1', q1:5, q2:4},
+  {id:14, created:'2026-06-23', customer:{name:'Sam Okafor',company:'Initech'}, ticket:{id:1150,subject:'Data export'}, survey:'s2', q1:5, q2:5},
+  {id:15, created:'2026-06-22', customer:{name:'Jordan Reyes',company:'Acme'}, ticket:{id:1147,subject:'Login issues'}, survey:'s1', q1:4, q2:4},
+  {id:16, created:'2026-06-22', customer:{name:'gam',company:'kon test wp'}, ticket:{id:1149,subject:'Product tour'}, survey:'s2', q1:3, q2:4},
+  {id:17, created:'2026-06-21', customer:{name:'Maya Chen',company:'Acme'}, ticket:{id:1141,subject:'Feature request'}, survey:'s1', q1:2, q2:2},
+  {id:18, created:'2026-06-21', customer:{name:'Nadia Popescu',company:'Globex'}, ticket:{id:1138,subject:'Billing question'}, survey:'s1', q1:5, q2:5},
+  {id:19, created:'2026-06-20', customer:{name:'Lars Berg',company:''}, ticket:null, survey:'s1', q1:4, q2:4},
+  {id:20, created:'2026-06-20', customer:{name:'Test User',company:'Acme'}, ticket:{id:1130,subject:'Password reset'}, survey:'s2', q1:5, q2:4},
+  {id:21, created:'2026-06-19', customer:{name:'Tester Customer',company:'Acme'}, ticket:{id:1127,subject:'Data export'}, survey:'s1', q1:3, q2:3},
+  {id:22, created:'2026-06-19', customer:{name:'Sam Okafor',company:'Initech'}, ticket:{id:1124,subject:'API integration'}, survey:'s1', q1:1},
+  {id:23, created:'2026-06-18', customer:{name:'Priya Nair',company:'Globex'}, ticket:{id:1120,subject:'Onboarding call'}, survey:'s2', q1:4, q2:5},
+  {id:24, created:'2026-06-18', customer:{name:'Jordan Reyes',company:'Acme'}, ticket:null, survey:'s1', q1:5, q2:5}
+];
+
+function buildBaselineResponses(){
+  return BASELINE_RESPONSES.map(r => {
+    const survey = BASELINE_SURVEYS[r.survey];
+    const q1def = survey.questions.q1;
+    const q2def = survey.questions.q2;
+    const q2 = (r.q2 !== undefined)
+      ? {def:q2def, blank:false, value:r.q2}
+      : {def:q2def, blank:true, reason:'unanswered'};
+    return {
+      id:r.id, created:r.created, customer:r.customer, ticket:r.ticket, survey,
+      q1:{def:q1def, value:r.q1, editedNote:null},
+      q2, tags:[]
+    };
+  });
+}
+const BASELINE_ALL = buildBaselineResponses();
+
+// ---------------------------------------------------------------------
+// BACKLOG EXAMPLES — the same two surveys after each numbered item has
+// been built. Used only by the six backlog tabs, never by Baseline.
+// ---------------------------------------------------------------------
+const EXAMPLE_SURVEYS = {
+  s1: {
+    id:'s1', name:'Post-ticket CSAT', labelMap:null,
+    questions:{
+      q1:{id:'q1', order:1, type:'rating', text:'How did we do?'},
+      q2:{id:'q2', order:2, type:'comment', text:'Anything you would add?',
+          conditionalOn:{q:'q1', op:'>', val:2}}
+    }
+  },
+  s2: {
+    id:'s2', name:'Onboarding pulse', labelMap:{1:'Meh',2:'Rough',3:'Fine',4:'Nice',5:'Awesome'},
+    questions:{
+      q1:{id:'q1', order:1, type:'rating', text:'How would you rate onboarding?'},
+      q2:{id:'q2', order:2, type:'multiselect', text:'What made the biggest difference?',
+          options:['Docs','Support team','Pricing','Kickoff call','Product itself']}
+    }
+  }
+};
+
+const EXAMPLE_RESPONSES = [
+  {id:1, created:'2026-06-29', customer:{name:'Maya Chen',company:'Acme'}, ticket:{id:1102,subject:'Login issues'}, survey:'s1',
+    q1:{value:4}, q2:{value:'Support was quick, thanks!'}},
+  {id:3, created:'2026-06-28', customer:{name:'Jordan Reyes',company:'Acme'}, ticket:{id:1099,subject:'Billing question'}, survey:'s1',
+    q1:{value:2}},
+  {id:4, created:'2026-06-28', customer:{name:'Priya Nair',company:'Globex'}, ticket:null, survey:'s2',
+    q1:{value:5}, q2:{value:['Support team','Kickoff call']}},
+  {id:5, created:'2026-06-27', customer:{name:'Sam Okafor',company:'Initech'}, ticket:{id:1085,subject:'Feature request'}, survey:'s2',
+    q1:{value:4}, q2:{value:['Docs','Product itself']}},
+  {id:6, created:'2026-06-27', customer:{name:'Test User',company:'Acme'}, ticket:{id:1080,subject:'Support chat'}, survey:'s1',
+    q1:{value:4, edited:true, previousValue:2, previousAt:'2026-06-20'}, q2:{value:'Appreciate the quick turnaround.'}},
+  {id:7, created:'2026-06-26', customer:{name:'Tester Customer',company:'Acme'}, ticket:{id:1078,subject:'Password reset'}, survey:'s1',
+    q1:{value:0, legacy:true}},
+  {id:8, created:'2026-06-26', customer:{name:'gam',company:'kon test wp'}, ticket:null, survey:'s1',
+    q1:{value:3}, q2:{value:'Nothing major, just a bit slow to respond.'}},
+  {id:9, created:'2026-06-25', customer:{name:'Lars Berg',company:''}, ticket:{id:1070,subject:'Onboarding call'}, survey:'s2',
+    q1:{value:2}, q2:{value:['Pricing']}},
+  {id:10, created:'2026-06-25', customer:{name:'Nadia Popescu',company:'Globex'}, ticket:{id:1066,subject:'API integration'}, survey:'s1',
+    q1:{value:5}, q2:{value:'Everything just worked.'}},
+  {id:11, created:'2026-06-24', customer:{name:'Test User',company:'Acme'}, ticket:{id:1061,subject:'Old survey run'}, survey:'s2',
+    q1:{value:4}, q2:{value:['Slack channel'], removedOptions:['Slack channel']}},
+  {id:14, created:'2026-06-23', customer:{name:'Sam Okafor',company:'Initech'}, ticket:{id:1050,subject:'Data export'}, survey:'s2',
+    q1:{value:5}, q2:{value:['Docs','Support team','Product itself']}},
+  {id:21, created:'2026-06-19', customer:{name:'Tester Customer',company:'Acme'}, ticket:{id:1027,subject:'Data export'}, survey:'s1',
+    q1:{value:3}, q2:{value:'Took a couple of tries to get the format right.'}}
+];
+
+function buildExampleResponses(){
+  return EXAMPLE_RESPONSES.map(r => {
+    const survey = EXAMPLE_SURVEYS[r.survey];
+    const q1def = survey.questions.q1;
+    const q2def = survey.questions.q2;
+    const tags = [];
+
+    if(survey.labelMap) tags.push({code:'B1', title:'Backlog 1 — custom CSAT choices for this survey'});
+    if(r.q1.legacy) tags.push({code:'B5', title:'Backlog 5 — legacy score, label resolved from fallback map'});
+    if(r.q1.edited) tags.push({code:'B4', title:`Backlog 4 — re-answered (was ${r.q1.previousValue} on ${r.q1.previousAt})`});
+
+    let q2;
+    if(q2def.conditionalOn){
+      const cond = q2def.conditionalOn;
+      const met = evaluateCondition(r.q1.value, cond.op, cond.val);
+      tags.push({code:'B6', title: met
+        ? 'Backlog 6 — condition met, Q2 shown'
+        : `Backlog 6 — Q2 hidden (needs rating ${cond.op} ${cond.val})`});
+      q2 = (met && r.q2)
+        ? {def:q2def, blank:false, value:r.q2.value, removedOptions:r.removedOptions||[]}
+        : {def:q2def, blank:true, reason: met ? 'unanswered' : 'condition-not-met'};
+    } else {
+      q2 = r.q2
+        ? {def:q2def, blank:false, value:r.q2.value, removedOptions:r.removedOptions||[]}
+        : {def:q2def, blank:true, reason:'unanswered'};
+    }
+
+    if(!q2.blank){
+      if(q2def.type === 'comment') tags.push({code:'B3', title:'Backlog 3 — comment question type, same value column as ratings'});
+      if(q2def.type === 'multiselect') tags.push({code:'B2', title:'Backlog 2 — multi-select, several values in one answer'});
+      if(r.removedOptions && r.removedOptions.length) tags.push({code:'B5', title:'Backlog 5 — references an option removed from current survey settings'});
+    }
+
+    return {
+      id:r.id, created:r.created, customer:r.customer, ticket:r.ticket, survey,
+      q1:{def:q1def, value:r.q1.value, editedNote: r.q1.edited ? `Originally ${r.q1.previousValue} on ${r.q1.previousAt}` : null},
+      q2, tags
+    };
+  });
+}
+const EXAMPLE_ALL = buildExampleResponses();
+
+const TABS = [
+  {key:'baseline', label:'Baseline'},
+  {key:'b1', label:'1 · Custom choice label'},
+  {key:'b2', label:'2 · Multi-select'},
+  {key:'b3', label:'3 · Comment type'},
+  {key:'b4', label:'4 · Re-answer'},
+  {key:'b5', label:'5 · Dynamic display'},
+  {key:'b6', label:'6 · Conditional display'}
+];
+
+const CAPTIONS = {
+  baseline:'Seed state — before any backlog work. Two rating-only surveys, the fixed 1–5 scale, hardcoded default labels. About 20% of responses have no ticket, one legacy score of 0 sits in the data, a couple of responses simply skipped Q2, and a response with no captured customer name displays as Anonymous rather than a blank cell.',
+  b1:'Same score, different label. Each survey overrides the fixed Terrible…Great map with its own label set — compare ratings 4 and 5 across the two surveys below.',
+  b2:'One answer, several selected values, rendered in the Q2 cell — a question type the single-value Answer column can\'t hold on its own.',
+  b3:'Free text living in the same Answer.value column as ratings. This is exactly what breaks a naive int(value) assumption.',
+  b4:'The table always shows the latest value. Hover "edited" to see what the answer used to be before it was resubmitted.',
+  b5:'Labels and choices render from current settings, not from whatever was true when the answer was submitted — a legacy score and a removed option both degrade gracefully instead of crashing.',
+  b6:'Q2 only exists when Q1\'s rating is greater than 2. Row 1 has a blank Q2 cell (rating 2, hidden); rows 2 and 3 show the boundary (rating 3) and a clear pass (rating 4) with Q2 filled in.'
+};
+
+const CURATED = {
+  b1: [1,5,10,4],
+  b2: [4,5,9,14],
+  b3: [1,8,21],
+  b4: [6],
+  b5: [7,11],
+  b6: [3,8,1]
+};
+
+function findExample(id){
+  return EXAMPLE_ALL.find(r => r.id === id);
+}
+
+let currentTab = 'baseline';
+let sortDesc = true;
+
+function applyFilters(){
+  if(currentTab !== 'baseline'){
+    const rows = CURATED[currentTab].map(id => findExample(id)).filter(Boolean);
+    render(rows);
+    return;
+  }
+
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const surveyFilter = document.getElementById('surveyFilter').value;
+  const ratingFilter = document.querySelector('.rchip.active').dataset.val;
+  const ticketlessOnly = document.getElementById('ticketlessOnly').checked;
+
+  let rows = BASELINE_ALL.filter(r => {
+    if(surveyFilter !== 'all' && r.survey.id !== surveyFilter) return false;
+    if(ratingFilter !== 'all' && r.q1.value !== Number(ratingFilter)) return false;
+    if(ticketlessOnly && r.ticket) return false;
+    if(q){
+      const hay = `${r.customer.name} ${r.customer.company}`.toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  rows = rows.slice().sort((a,b) => sortDesc ? b.created.localeCompare(a.created) : a.created.localeCompare(b.created));
+
+  render(rows);
+}
+
+function render(rows){
+  const isBaseline = currentTab === 'baseline';
+  const showBlankReason = !isBaseline;
+  const showQ2 = currentTab !== 'b1';
+  document.getElementById('q2Header').classList.toggle('hidden-col', !showQ2);
+
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = rows.map(r => {
+    const q1Html = `
+      <span class="qtext">${r.q1.def.text}<span class="qtype">${r.q1.def.type}</span></span>
+      ${cellAnswerHtml(r.survey, r.q1.def, r.q1.value)}${r.q1.editedNote ? `<span class="edited-tag" title="${r.q1.editedNote}">edited</span>` : ''}
+    `;
+    const q2Html = r.q2.blank
+      ? (showBlankReason ? `<span class="qcell-blank">${r.q2.reason === 'condition-not-met' ? 'blank — condition not met' : 'blank — not answered'}</span>` : '')
+      : `<span class="qtext">${r.q2.def.text}<span class="qtype">${r.q2.def.type}</span></span>${cellAnswerHtml(r.survey, r.q2.def, r.q2.value, r.q2.removedOptions)}`;
+
+    return `
+    <tr>
+      <td>${r.created}</td>
+      <td>${r.customer.name || '<span class="ticket-none">Anonymous</span>'}</td>
+      <td class="company">${r.customer.company || '—'}</td>
+      <td>${r.ticket ? `<span class="ticket">#${r.ticket.id}</span> ${r.ticket.subject}` : '<span class="ticket-none">No ticket</span>'}</td>
+      <td>${r.survey.name}</td>
+      <td class="qcell">${q1Html}</td>
+      ${showQ2 ? `<td class="qcell">${q2Html}</td>` : ''}
+    </tr>
+  `;
+  }).join('');
+
+  document.getElementById('countLabel').textContent = isBaseline
+    ? `Showing ${rows.length} of ${BASELINE_ALL.length} responses`
+    : `${rows.length} example response${rows.length === 1 ? '' : 's'}`;
+}
+
+document.getElementById('searchInput').addEventListener('input', applyFilters);
+document.getElementById('surveyFilter').addEventListener('change', applyFilters);
+document.getElementById('ticketlessOnly').addEventListener('change', applyFilters);
+document.querySelectorAll('.rchip').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.rchip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyFilters();
+  });
+});
+document.getElementById('sortCreated').addEventListener('click', () => {
+  sortDesc = !sortDesc;
+  document.querySelector('#sortCreated .arrow').textContent = sortDesc ? '▼' : '▲';
+  applyFilters();
+});
+
+const tabsEl = document.getElementById('tabs');
+tabsEl.innerHTML = TABS.map(t => `<button class="tab${t.key==='baseline'?' active':''}" data-key="${t.key}">${t.label}</button>`).join('');
+
+function switchTab(key){
+  currentTab = key;
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.key === key));
+  document.getElementById('toolbar').style.display = key === 'baseline' ? 'flex' : 'none';
+  document.getElementById('tabCaption').textContent = CAPTIONS[key];
+  applyFilters();
+}
+tabsEl.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.key)));
+
+document.getElementById('tabCaption').textContent = CAPTIONS.baseline;
+applyFilters();
+</script>
+</body>
+</html>
