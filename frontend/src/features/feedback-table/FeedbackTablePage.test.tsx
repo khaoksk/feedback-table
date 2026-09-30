@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   archivedQuestions,
+  conditionUpdates,
   createdQuestions,
   handlers,
   labelUpdates,
@@ -15,6 +16,7 @@ import {
   row,
   server,
   SURVEYS,
+  surveysWithCondition,
   tableRequests,
 } from '../../test/server'
 import { FeedbackTablePage } from './FeedbackTablePage'
@@ -693,6 +695,89 @@ describe('FeedbackTablePage', () => {
 
       const section = screen.getByRole('region', { name: 'Archived questions' })
       expect(await within(section).findByText('How easy was it to get started?')).toBeInTheDocument()
+    })
+  })
+
+  describe('conditional display (Req 6)', () => {
+    it('distinguishes a hidden question from a skipped one', async () => {
+      server.use(
+        handlers.table(() =>
+          page([
+            row({
+              survey_id: 3,
+              answers: {
+                '31': { value: '2', display: 'Bad', state: 'ok' },
+                '32': { value: null, display: null, state: 'unanswered' },
+                '33': { value: null, display: null, state: 'condition_not_met' },
+              },
+            }),
+          ]),
+        ),
+      )
+      renderPage()
+      const [first] = await waitForRows()
+      const cells = within(first).getAllByRole('cell')
+
+      expect(cells[6]).toHaveTextContent('blank — not answered')
+      expect(cells[7]).toHaveTextContent('blank — condition not met')
+    })
+
+    it('describes and sets a condition from the questions panel', async () => {
+      server.use(handlers.surveys(surveysWithCondition()))
+      const { user } = renderPage('/?survey=3')
+      await waitForRows()
+      await user.click(screen.getByRole('button', { name: 'Edit questions' }))
+      const panel = screen.getByRole('region', { name: /^Questions of/ })
+      const q3 = within(panel).getAllByRole('listitem')[2]
+
+      expect(q3).toHaveTextContent('Shown when Q1 > 2')
+      await user.click(within(q3).getByRole('button', { name: 'Edit condition' }))
+      const form = within(q3).getByRole('form', { name: 'Condition of Q3' })
+      await user.selectOptions(within(form).getByLabelText('Operator'), '>=')
+      await user.clear(within(form).getByLabelText('Threshold'))
+      await user.type(within(form).getByLabelText('Threshold'), '4')
+      await user.click(within(form).getByRole('button', { name: 'Save condition' }))
+
+      await waitFor(() =>
+        expect(conditionUpdates).toEqual([
+          { questionId: 33, body: { condition: { question_id: 31, operator: '>=', value: 4 } } },
+        ]),
+      )
+    })
+
+    it('can switch a condition off', async () => {
+      server.use(handlers.surveys(surveysWithCondition()))
+      const { user } = renderPage('/?survey=3')
+      await waitForRows()
+      await user.click(screen.getByRole('button', { name: 'Edit questions' }))
+      const q3 = within(screen.getByRole('region', { name: /^Questions of/ })).getAllByRole('listitem')[2]
+
+      await user.click(within(q3).getByRole('button', { name: 'Edit condition' }))
+      await user.click(within(q3).getByRole('button', { name: 'Always show' }))
+
+      await waitFor(() => expect(conditionUpdates).toEqual([{ questionId: 33, body: { condition: null } }]))
+    })
+
+    it('only offers earlier rating questions as the source', async () => {
+      const { user } = renderPage('/?survey=3')
+      await waitForRows()
+      await user.click(screen.getByRole('button', { name: 'Edit questions' }))
+      const items = within(screen.getByRole('region', { name: /^Questions of/ })).getAllByRole('listitem')
+
+      expect(within(items[0]).queryByRole('button', { name: /condition/ })).not.toBeInTheDocument()
+      await user.click(within(items[2]).getByRole('button', { name: 'Set condition' }))
+      const sources = within(items[2]).getByLabelText('Depends on')
+      expect(within(sources).getAllByRole('option').map((o) => o.textContent)).toEqual(['Q1'])
+    })
+
+    it('says when a condition is off because its source was archived', async () => {
+      server.use(handlers.surveys(surveysWithCondition(false)))
+      const { user } = renderPage('/?survey=3')
+      await waitForRows()
+      await user.click(screen.getByRole('button', { name: 'Edit questions' }))
+      const q3 = within(screen.getByRole('region', { name: /^Questions of/ })).getAllByRole('listitem')[2]
+
+      expect(q3).toHaveTextContent('Condition off: the question it depended on was archived')
     })
   })
 })

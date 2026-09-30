@@ -1,4 +1,4 @@
-import type { ArchivedQuestion, FeedbackTablePage, Question, QuestionType, Survey } from './types'
+import type { ArchivedQuestion, Condition, FeedbackTablePage, Question, QuestionType, Survey } from './types'
 
 export class ApiError extends Error {
   readonly status: number
@@ -67,6 +67,14 @@ export function fetchArchivedQuestions(surveyId: number, signal?: AbortSignal): 
 /** Archive a question: it leaves the survey, later questions move up, answers stay (Req 5). */
 export function archiveQuestion(questionId: number): Promise<void> {
   return sendJson<void>('DELETE', `/api/questions/${questionId}/`)
+}
+
+/** Show a question only when an earlier rating meets a condition, or (null) always (Req 6). */
+export function setCondition(
+  questionId: number,
+  condition: Omit<Condition, 'active'> | null,
+): Promise<Question> {
+  return sendJson<Question>('PUT', `/api/questions/${questionId}/condition/`, { condition })
 }
 
 /** Replace a multi-select question's options; ones left out are archived, not deleted. */

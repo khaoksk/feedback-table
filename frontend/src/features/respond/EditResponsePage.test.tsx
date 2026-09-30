@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
-import { EDIT_TOKEN, handlers, responseUpdates, server } from '../../test/server'
+import { EDIT_TOKEN, EDITABLE, handlers, responseUpdates, server, surveysWithCondition } from '../../test/server'
 import { EditResponsePage } from './EditResponsePage'
 
 function renderEdit(token = EDIT_TOKEN) {
@@ -101,5 +101,19 @@ describe('EditResponsePage (Req 4)', () => {
     await user.click(within(form).getByRole('button', { name: 'Save changes' }))
 
     expect(await screen.findByRole('status')).toHaveTextContent('Nothing changed.')
+  })
+})
+
+describe('EditResponsePage with a condition (Req 6)', () => {
+  it('keeps an answer to a question now hidden, and says so', async () => {
+    server.use(
+      handlers.surveys(surveysWithCondition()),
+      handlers.editResponse(() => HttpResponse.json({ ...EDITABLE, answers: { '31': 1, '33': 'Kept from before' } })),
+    )
+    renderEdit()
+    const form = await editForm()
+
+    expect(within(form).queryByRole('textbox', { name: 'Anything you would add?' })).not.toBeInTheDocument()
+    expect(within(form).getByText(/Q3 is hidden by its condition; your earlier answer to it is kept/)).toBeInTheDocument()
   })
 })

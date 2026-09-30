@@ -24,8 +24,8 @@ export const SURVEYS: Survey[] = [
     rating_scale: DEFAULT_SCALE,
     custom_labels: false,
     questions: [
-      { id: 11, order: 1, text: 'How satisfied were you?', type: 'rating', options: [] },
-      { id: 12, order: 2, text: 'How fast was our reply?', type: 'rating', options: [] },
+      { id: 11, order: 1, text: 'How satisfied were you?', type: 'rating', options: [], condition: null },
+      { id: 12, order: 2, text: 'How fast was our reply?', type: 'rating', options: [], condition: null },
     ],
   },
   {
@@ -34,9 +34,9 @@ export const SURVEYS: Survey[] = [
     rating_scale: TEN_POINT_SCALE,
     custom_labels: true,
     questions: [
-      { id: 21, order: 1, text: 'How likely are you to recommend us?', type: 'rating', options: [] },
-      { id: 22, order: 2, text: 'How well does it fit?', type: 'rating', options: [] },
-      { id: 23, order: 3, text: 'Value for money?', type: 'rating', options: [] },
+      { id: 21, order: 1, text: 'How likely are you to recommend us?', type: 'rating', options: [], condition: null },
+      { id: 22, order: 2, text: 'How well does it fit?', type: 'rating', options: [], condition: null },
+      { id: 23, order: 3, text: 'Value for money?', type: 'rating', options: [], condition: null },
     ],
   },
   {
@@ -45,7 +45,7 @@ export const SURVEYS: Survey[] = [
     rating_scale: DEFAULT_SCALE,
     custom_labels: false,
     questions: [
-      { id: 31, order: 1, text: 'How easy was it to get started?', type: 'rating', options: [] },
+      { id: 31, order: 1, text: 'How easy was it to get started?', type: 'rating', options: [], condition: null },
       {
         id: 32,
         order: 2,
@@ -56,8 +56,9 @@ export const SURVEYS: Survey[] = [
           { id: 302, label: 'Support team', order: 2 },
           { id: 303, label: 'Kickoff call', order: 3 },
         ],
+        condition: null,
       },
-      { id: 33, order: 3, text: 'Anything you would add?', type: 'comment', options: [] },
+      { id: 33, order: 3, text: 'Anything you would add?', type: 'comment', options: [], condition: null },
     ],
   },
 ]
@@ -97,6 +98,21 @@ export const responseUpdates: { responseId: number; token: string | null; body: 
 /** DELETE /api/questions/<id>/ and PUT .../options/ requests seen during a test. */
 export const archivedQuestions: number[] = []
 export const optionUpdates: { questionId: number; body: unknown }[] = []
+export const conditionUpdates: { questionId: number; body: unknown }[] = []
+
+/** SURVEYS with Onboarding's comment (Q3) shown only when Q1 > 2 (Req 6). */
+export function surveysWithCondition(active = true): Survey[] {
+  return SURVEYS.map((survey) =>
+    survey.id !== 3
+      ? survey
+      : {
+          ...survey,
+          questions: survey.questions.map((q) =>
+            q.id === 33 ? { ...q, condition: { question_id: 31, operator: '>' as const, value: 2, active } } : q,
+          ),
+        },
+  )
+}
 
 export const EDIT_TOKEN = 'tok-123'
 
@@ -121,7 +137,7 @@ export const handlers = {
     http.post('*/api/surveys/:id/questions/', async ({ params, request }) => {
       createdQuestions.push({ surveyId: Number(params.id), body: await request.json() })
       if (respond) return respond()
-      return HttpResponse.json({ id: 99, order: 3, text: 'New', type: 'rating', options: [] }, { status: 201 })
+      return HttpResponse.json({ id: 99, order: 3, text: 'New', type: 'rating', options: [], condition: null }, { status: 201 })
     }),
   submitResponse: (respond?: () => Response) =>
     http.post('*/api/surveys/:id/responses/', async ({ params, request }) => {
@@ -148,10 +164,15 @@ export const handlers = {
       archivedQuestions.push(Number(params.id))
       return respond ? respond() : new HttpResponse(null, { status: 204 })
     }),
+  setCondition: () =>
+    http.put('*/api/questions/:id/condition/', async ({ params, request }) => {
+      conditionUpdates.push({ questionId: Number(params.id), body: await request.json() })
+      return HttpResponse.json({ id: Number(params.id), order: 3, text: 'x', type: 'comment', options: [], condition: null })
+    }),
   updateOptions: (respond?: () => Response) =>
     http.put('*/api/questions/:id/options/', async ({ params, request }) => {
       optionUpdates.push({ questionId: Number(params.id), body: await request.json() })
-      return respond ? respond() : HttpResponse.json({ id: Number(params.id), order: 2, text: 'x', type: 'multiselect', options: [] })
+      return respond ? respond() : HttpResponse.json({ id: Number(params.id), order: 2, text: 'x', type: 'multiselect', options: [], condition: null })
     }),
   updateLabels: (respond?: (surveyId: number) => Response) =>
     http.put('*/api/surveys/:id/rating-labels/', async ({ params, request }) => {
@@ -181,6 +202,7 @@ export const server = setupServer(
   handlers.archivedQuestions(),
   handlers.archiveQuestion(),
   handlers.updateOptions(),
+  handlers.setCondition(),
 )
 
 export function lastTableParams(): URLSearchParams {
@@ -197,4 +219,5 @@ export function resetTableRequests() {
   responseUpdates.length = 0
   archivedQuestions.length = 0
   optionUpdates.length = 0
+  conditionUpdates.length = 0
 }

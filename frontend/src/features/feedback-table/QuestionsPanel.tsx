@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 
-import { archiveQuestion, fetchArchivedQuestions, updateOptions } from '../../api/client'
-import type { Question, Survey } from '../../api/types'
+import { archiveQuestion, fetchArchivedQuestions, setCondition, updateOptions } from '../../api/client'
+import type { Condition, Question, Survey } from '../../api/types'
+import { describeCondition } from '../respond/conditions'
 import { apiErrors } from '../respond/links'
 
 interface Props {
@@ -23,6 +24,7 @@ const TYPE_LABEL: Record<Question['type'], string> = {
  */
 export function QuestionsPanel({ survey, onClose }: Props) {
   const [editing, setEditing] = useState<number | null>(null)
+  const [conditionFor, setConditionFor] = useState<number | null>(null)
 
   return (
     <section className="panel-form" aria-labelledby="questions-panel-title">
@@ -39,7 +41,21 @@ export function QuestionsPanel({ survey, onClose }: Props) {
               canArchive={survey.questions.length > 1}
               editingOptions={editing === question.id}
               onEditOptions={() => setEditing(editing === question.id ? null : question.id)}
+              sources={survey.questions.filter((q) => q.type === 'rating' && q.order < question.order)}
+              editingCondition={conditionFor === question.id}
+              onEditCondition={() => setConditionFor(conditionFor === question.id ? null : question.id)}
             />
+            {question.condition && (
+              <p className="condition-note">{describeCondition(question.condition, survey.questions)}</p>
+            )}
+            {conditionFor === question.id && (
+              <ConditionEditor
+                key={question.id}
+                question={question}
+                sources={survey.questions.filter((q) => q.type === 'rating' && q.order < question.order)}
+                onDone={() => setConditionFor(null)}
+              />
+            )}
             {editing === question.id && (
               <OptionsEditor key={question.id} question={question} onDone={() => setEditing(null)} />
             )}
@@ -104,11 +120,18 @@ function QuestionRow({
   canArchive,
   editingOptions,
   onEditOptions,
+  sources,
+  editingCondition,
+  onEditCondition,
 }: {
   question: Question
   canArchive: boolean
   editingOptions: boolean
   onEditOptions: () => void
+  /** Earlier rating questions this one could depend on. */
+  sources: Question[]
+  editingCondition: boolean
+  onEditCondition: () => void
 }) {
   const refresh = useRefresh()
   const [confirming, setConfirming] = useState(false)
@@ -123,6 +146,11 @@ function QuestionRow({
       {question.type === 'multiselect' && (
         <button type="button" className="link-button" aria-expanded={editingOptions} onClick={onEditOptions}>
           {editingOptions ? 'Close options' : 'Edit options'}
+        </button>
+      )}
+      {sources.length > 0 && (
+        <button type="button" className="link-button" aria-expanded={editingCondition} onClick={onEditCondition}>
+          {editingCondition ? 'Close condition' : question.condition ? 'Edit condition' : 'Set condition'}
         </button>
       )}
       {canArchive &&
@@ -263,6 +291,73 @@ function OptionsEditor({ question, onDone }: { question: Question; onDone: () =>
           {save.isPending ? 'Saving…' : 'Save options'}
         </button>
       </div>
+    </form>
+  )
+}
+
+const OPERATORS: Condition['operator'][] = ['>', '>=', '<', '<=', '=']
+
+/** Show a question only when an earlier rating meets a condition (Req 6). */
+function ConditionEditor({ question, sources, onDone }: { question: Question; sources: Question[]; onDone: () => void }) {
+  const refresh = useRefresh()
+  const current = question.condition?.active ? question.condition : null
+  const [sourceId, setSourceId] = useState(current?.question_id ?? sources[sources.length - 1].id)
+  const [operator, setOperator] = useState<Condition['operator']>(current?.operator ?? '>')
+  const [value, setValue] = useState(current?.value ?? 2)
+
+  const save = useMutation({
+    mutationFn: (condition: Omit<Condition, 'active'> | null) => setCondition(question.id, condition),
+    onSuccess: async () => {
+      await refresh()
+      onDone()
+    },
+  })
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    save.mutate({ question_id: sourceId, operator, value })
+  }
+
+  const errors = apiErrors(save.error, "Couldn't save the condition. Try again.")
+
+  return (
+    <form className="condition-form" aria-label={`Condition of Q${question.order}`} onSubmit={submit}>
+      <span>Show Q{question.order} only when</span>
+      <select aria-label="Depends on" value={sourceId} onChange={(e) => setSourceId(Number(e.target.value))}>
+        {sources.map((source) => (
+          <option key={source.id} value={source.id}>
+            Q{source.order}
+          </option>
+        ))}
+      </select>
+      <select aria-label="Operator" value={operator} onChange={(e) => setOperator(e.target.value as Condition['operator'])}>
+        {OPERATORS.map((op) => (
+          <option key={op} value={op}>
+            {op}
+          </option>
+        ))}
+      </select>
+      <input
+        type="number"
+        aria-label="Threshold"
+        min={0}
+        max={10}
+        value={value}
+        onChange={(e) => setValue(Number(e.target.value))}
+      />
+      <button type="submit" className="link-button" disabled={save.isPending}>
+        Save condition
+      </button>
+      {question.condition && (
+        <button type="button" className="link-button" disabled={save.isPending} onClick={() => save.mutate(null)}>
+          Always show
+        </button>
+      )}
+      {errors.length > 0 && (
+        <span className="error inline" role="alert">
+          {errors.join(' ')}
+        </span>
+      )}
     </form>
   )
 }

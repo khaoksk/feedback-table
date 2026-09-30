@@ -750,3 +750,31 @@ tbody tr:hover {
   font-size: 13px;
   color: var(--text-secondary);
 }
+
+/* Conditional display (Req 6) */
+.condition-note {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.condition-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 4px 16px;
+  font-size: 13px;
+}
+
+.condition-form select,
+.condition-form input {
+  height: 30px;
+  border: 0.5px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 0 6px;
+  font-size: 13px;
+}
+
+.condition-form input {
+  width: 64px;
+}

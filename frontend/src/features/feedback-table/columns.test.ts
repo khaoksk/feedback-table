@@ -18,7 +18,7 @@ describe('columnCount', () => {
       ...SURVEYS[0],
       id: 9,
       name: 'Gappy',
-      questions: [{ id: 1, order: 4, text: 'x', type: 'rating' as const, options: [] }],
+      questions: [{ id: 1, order: 4, text: 'x', type: 'rating' as const, options: [], condition: null }],
     }
     expect(columnCount([gappy])).toBe(4)
   })

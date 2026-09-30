@@ -40,6 +40,7 @@ src/
     Toolbar.tsx, FeedbackTable.tsx, AnswerCell.tsx, Pagination.tsx
   features/respond/        "Answer a survey" at /respond, and the private edit link /respond/<id>?token=...
     ResponseForm.tsx       the questions as fields, shared by answering and editing
+    conditions.ts          which questions a respondent's answers hide (mirrors the backend rule, Req 6)
   routes.ts                which page a path shows
   test/                    Vitest setup and the MSW mock API
 ```

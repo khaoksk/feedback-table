@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
-import { handlers, server, submittedResponses } from '../../test/server'
+import { handlers, server, submittedResponses, surveysWithCondition } from '../../test/server'
 import { RespondPage } from './RespondPage'
 
 async function renderRespond() {
@@ -162,5 +162,46 @@ describe('RespondPage comments (Req 3)', () => {
     await user.type(within(form).getByRole('textbox', { name: 'Anything you would add?' }), '   ')
 
     expect(within(form).getByRole('button', { name: 'Submit response' })).toBeDisabled()
+  })
+})
+
+describe('RespondPage conditional questions (Req 6)', () => {
+  it('shows a question only once the earlier rating meets its condition', async () => {
+    server.use(handlers.surveys(surveysWithCondition()))
+    const { user } = await renderRespond()
+    const form = await pickSurvey(user, 'Onboarding CSAT')
+    const comment = () => within(form).queryByRole('textbox', { name: 'Anything you would add?' })
+    const q1 = within(form).getByRole('group', { name: /^Q1\./ })
+
+    expect(comment()).not.toBeInTheDocument()
+    await user.click(within(q1).getByRole('radio', { name: /2\s*Bad/ }))
+    expect(comment()).not.toBeInTheDocument() // Q1 > 2 fails at exactly 2
+    await user.click(within(q1).getByRole('radio', { name: /3\s*Okay/ }))
+    expect(comment()).toBeInTheDocument()
+  })
+
+  it('does not send an answer to a question hidden again', async () => {
+    server.use(handlers.surveys(surveysWithCondition()))
+    const { user } = await renderRespond()
+    const form = await pickSurvey(user, 'Onboarding CSAT')
+    const q1 = within(form).getByRole('group', { name: /^Q1\./ })
+
+    await user.type(within(form).getByLabelText('Email'), 'ada@example.com')
+    await user.click(within(q1).getByRole('radio', { name: /4\s*Good/ }))
+    await user.type(within(form).getByRole('textbox', { name: 'Anything you would add?' }), 'Great')
+    await user.click(within(q1).getByRole('radio', { name: /1\s*Terrible/ }))
+    await user.click(within(form).getByRole('button', { name: 'Submit response' }))
+
+    await screen.findByRole('status')
+    expect(submittedResponses[0].body).toMatchObject({ answers: { '31': 1 } })
+    expect((submittedResponses[0].body as { answers: object }).answers).not.toHaveProperty('33')
+  })
+
+  it('always shows a question whose condition was switched off', async () => {
+    server.use(handlers.surveys(surveysWithCondition(false)))
+    const { user } = await renderRespond()
+    const form = await pickSurvey(user, 'Onboarding CSAT')
+
+    expect(within(form).getByRole('textbox', { name: 'Anything you would add?' })).toBeInTheDocument()
   })
 })

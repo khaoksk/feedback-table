@@ -1,7 +1,7 @@
 // Shapes returned by the Django API (backend/feedback/views.py).
 
 /** How the backend resolved a stored answer (docs/PRD.md §6). */
-export type AnswerState = 'ok' | 'legacy' | 'invalid' | 'unanswered' | 'removed_option'
+export type AnswerState = 'ok' | 'legacy' | 'invalid' | 'unanswered' | 'removed_option' | 'condition_not_met'
 
 /** One chosen option of a multi-select answer, with its current label. */
 export interface Selection {
@@ -38,11 +38,21 @@ export interface Option {
   order: number
 }
 
+/** Show a question only when an earlier rating meets this (Req 6). */
+export interface Condition {
+  question_id: number
+  operator: '>' | '>=' | '<' | '<=' | '='
+  value: number
+  /** False when the source question was archived: the question then always shows. */
+  active: boolean
+}
+
 export interface Question {
   id: number
   order: number
   text: string
   type: QuestionType
+  condition: Condition | null
   /** Options a respondent can pick (multi-select); empty for ratings. */
   options: Option[]
 }
