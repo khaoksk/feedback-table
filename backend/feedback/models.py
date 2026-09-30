@@ -74,6 +74,17 @@ class Response(models.Model):
         max_length=20, choices=STATUS_CHOICES, default=STATUS_COMPLETED
     )
 
+    class Meta:
+        # The feedback table pages through responses newest first, usually
+        # filtered by status. Postgres reads either index backwards for DESC.
+        indexes = [
+            models.Index(fields=["submitted_at", "id"], name="response_submitted_idx"),
+            models.Index(
+                fields=["status", "submitted_at", "id"],
+                name="response_status_submitted_idx",
+            ),
+        ]
+
     def __str__(self):
         return f"Response #{self.pk}"
 
