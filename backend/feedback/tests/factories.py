@@ -2,7 +2,7 @@ import factory
 from django.utils import timezone
 from factory.django import DjangoModelFactory
 
-from feedback.models import Answer, Customer, Question, Response, Survey, Ticket
+from feedback.models import Answer, Customer, Option, Question, Response, Survey, Ticket
 
 
 class CustomerFactory(DjangoModelFactory):
@@ -37,6 +37,15 @@ class QuestionFactory(DjangoModelFactory):
     survey = factory.SubFactory(SurveyFactory)
     text = factory.Faker("sentence", nb_words=6)
     type = Question.RATING
+    order = factory.Sequence(lambda n: n + 1)
+
+
+class OptionFactory(DjangoModelFactory):
+    class Meta:
+        model = Option
+
+    question = factory.SubFactory(QuestionFactory, type=Question.MULTISELECT)
+    label = factory.Sequence(lambda n: f"Option {n}")
     order = factory.Sequence(lambda n: n + 1)
 
 

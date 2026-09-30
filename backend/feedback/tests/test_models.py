@@ -1,10 +1,11 @@
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 
-from feedback.models import Answer
+from feedback.models import Answer, Question
 
-from .factories import AnswerFactory, ResponseFactory, SurveyFactory
+from .factories import AnswerFactory, OptionFactory, QuestionFactory, ResponseFactory, SurveyFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -85,6 +86,23 @@ def test_answer_rating_is_checked_against_its_survey_scale(labels, value, valid)
     if valid:
         answer.full_clean()
     else:
+        with pytest.raises(ValidationError) as error:
+            answer.full_clean()
+        assert "value" in error.value.message_dict
+
+
+def test_multiselect_answer_must_use_active_options_of_its_question():
+    question = QuestionFactory(type=Question.MULTISELECT)
+    docs, pricing = OptionFactory(question=question), OptionFactory(question=question)
+    archived = OptionFactory(question=question, archived_at=timezone.now())
+    other_question_option = OptionFactory()
+    answer = AnswerFactory(question=question, response__survey=question.survey, value=f"[{docs.id}]")
+
+    answer.value = f"[{docs.id}, {pricing.id}]"
+    answer.full_clean()
+
+    for bad in (f"[{archived.id}]", f"[{other_question_option.id}]", "[]", "Docs"):
+        answer.value = bad
         with pytest.raises(ValidationError) as error:
             answer.full_clean()
         assert "value" in error.value.message_dict

@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from .scales import normalize_rating_labels, rating_scale
-from .validators import validate_rating
+from .validators import validate_rating, validate_selection
 
 
 class Customer(models.Model):
@@ -44,8 +44,10 @@ class Survey(models.Model):
 
 class Question(models.Model):
     RATING = "rating"
+    MULTISELECT = "multiselect"
     TYPE_CHOICES = [
         (RATING, "Rating"),
+        (MULTISELECT, "Multi-select"),
     ]
 
     survey = models.ForeignKey(
@@ -60,6 +62,26 @@ class Question(models.Model):
 
     def __str__(self):
         return self.text
+
+
+class Option(models.Model):
+    """One choice of a multi-select question.
+
+    Answers store option ids, not labels, so renaming an option relabels every
+    existing answer and archiving one keeps old answers readable (docs/PRD.md §7).
+    """
+
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="options")
+    label = models.CharField(max_length=100)
+    order = models.PositiveIntegerField(default=1)
+    # Set when an option is removed from the question; answers keep pointing at it.
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return self.label
 
 
 class Response(models.Model):
@@ -127,12 +149,15 @@ class Answer(models.Model):
         # validators. bulk_create skips it, so seed_bulk validates explicitly.
         if self.question_id is None:
             return
-        if self.question.type == Question.RATING:
-            scale = rating_scale(self.question.survey)
-            try:
+        try:
+            if self.question.type == Question.RATING:
+                scale = rating_scale(self.question.survey)
                 validate_rating(self.value, range(scale[0], scale[-1] + 1))
-            except ValidationError as error:
-                raise ValidationError({"value": error.messages})
+            elif self.question.type == Question.MULTISELECT:
+                active = self.question.options.filter(archived_at__isnull=True)
+                validate_selection(self.value, set(active.values_list("id", flat=True)))
+        except ValidationError as error:
+            raise ValidationError({"value": error.messages})
 
     def __str__(self):
         return f"Answer #{self.pk}"
