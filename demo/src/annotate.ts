@@ -37,10 +37,11 @@ export class Demo {
 
   /** A full-screen title card between sections, also a chapter marker. */
   async card(index: number, title: string, body: string[], holdMs = 4500): Promise<void> {
+    // A second card within a part is not a new chapter.
+    if (index !== this.section || !this.chip) this.timeline.chapter(`${index + 1}. ${this.sections[index]}`)
     this.section = index
     this.step = ''
     this.chip = `${index + 1} · ${this.sections[index]}`
-    this.timeline.chapter(`${index + 1}. ${this.sections[index]}`)
     this.timeline.caption(`${title} — ${body.join(' ').replace(/\*\*/g, '')}`)
     await this.draw('progress', this.sections, index, '')
     await this.draw('card', `Part ${index + 1} of ${this.sections.length}`, title, body)
@@ -138,7 +139,9 @@ export class Demo {
   }
 
   async goto(url: string): Promise<void> {
-    await this.page.goto(url, { waitUntil: 'networkidle' })
+    await this.page.goto(url, { waitUntil: 'load' })
+    // GitHub keeps live connections open, so "network idle" may never come.
+    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
     await this.pause(600)
   }
 

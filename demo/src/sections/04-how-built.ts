@@ -14,7 +14,7 @@ export async function howBuilt(demo: Demo): Promise<void> {
 
   await demo.goto(`${REPO_URL}/pulls?q=is%3Apr+is%3Aclosed+sort%3Acreated-asc`)
   await demo.say('One PR per requirement', 'Eight pull requests, in order: the PRD, the baseline table, then Req 1–6.')
-  await demo.spotlightIfPresent(page.locator('[id^="issue_"]').first(), 'PR #8: the PRD, before any code', 2500)
+  await demo.spotlightIfPresent(page.getByRole('link', { name: 'Add PRD for the feedback table feature' }), 'PR #8: the PRD, before any code', 2500)
   await demo.clear()
 
   await demo.goto(`${REPO_URL}/pull/13/commits`)
@@ -29,7 +29,7 @@ export async function howBuilt(demo: Demo): Promise<void> {
   }
   await demo.clear()
 
-  const doc = await page.goto(`${REPO_URL}/blob/master/docs/AI-COLLABORATION.md`, { waitUntil: 'networkidle' })
+  const doc = await page.goto(`${REPO_URL}/blob/master/docs/AI-COLLABORATION.md`, { waitUntil: 'load' })
   if (doc?.ok()) {
     await demo.say('Where I stepped in', 'Checking in the browser, I couldn’t find an archived question: that led to the **Archived questions** list.')
     await demo.spotlightIfPresent(page.getByRole('heading', { name: /rejected or substantially changed/i }), '', 2500)
