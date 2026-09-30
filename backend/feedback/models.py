@@ -86,6 +86,16 @@ class Answer(models.Model):
         Question, on_delete=models.CASCADE, related_name="answers"
     )
     value = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["response", "question"],
+                name="uniq_answer_response_question",
+            ),
+        ]
 
     def __str__(self):
         return f"Answer #{self.pk}"
