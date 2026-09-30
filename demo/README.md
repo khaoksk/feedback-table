@@ -31,7 +31,7 @@ cd demo
 npm install
 npx playwright install chromium
 
-npm run login        # once: log in to GitHub in the window that opens (the repo is private)
+npm run login        # once: log in to GitHub in the Chrome window that opens (the repo is private)
 npm run record       # all four parts
 npm run record:app   # parts 1–3 only, no GitHub login needed
 ```
@@ -60,8 +60,15 @@ The video has no audio, so you can record a voice-over on top of it.
 
 ## GitHub session
 
-`npm run login` saves the session to `.auth/github.json`. It is gitignored: never commit it, and delete it when
-you're done recording.
+Google sign-in refuses browsers that Playwright controls. So `npm run login` opens your installed Chrome (or Edge)
+as a normal browser, with a separate profile in `.auth/browser-profile/`. Log in there any way you like: password,
+Google or 2FA.
+
+Once a GitHub page loads with you logged in, the script connects, copies only GitHub's cookies to
+`.auth/github.json`, and closes the browser.
+
+Everything in `.auth/` is gitignored. Never commit it, and delete the folder when you're done recording. To use
+another browser, set `DEMO_BROWSER` to its executable.
 
 ## Layout
 
