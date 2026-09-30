@@ -7,7 +7,7 @@ TypeScript frontend, through the six backlog requirements in order.
 | | |
 |---|---|
 | Spec | [docs/PRD.md](docs/PRD.md) |
-| Backlog | Issues [#1](https://github.com/khaoksk/v1-self/issues/1)–[#7](https://github.com/khaoksk/v1-self/issues/7), one per item, all closed |
+| Backlog | Issues [#1](https://github.com/khaoksk/feedback-table/issues/1)–[#7](https://github.com/khaoksk/feedback-table/issues/7), one per item, all closed |
 | How I worked with the AI agent | [docs/AI-COLLABORATION.md](docs/AI-COLLABORATION.md) |
 | Judgment calls where the brief was open | [docs/JUDGMENT-CALLS.md](docs/JUDGMENT-CALLS.md) |
 
@@ -15,14 +15,14 @@ TypeScript frontend, through the six backlog requirements in order.
 
 | # | Item | PR |
 |---|---|---|
-| — | PRD | [#8](https://github.com/khaoksk/v1-self/pull/8) |
-| 0 | Baseline table: new endpoint, filters, pagination, 10K data, CI | [#9](https://github.com/khaoksk/v1-self/pull/9) |
-| 1 | Custom choice labels per survey (and scales other than 1–5) | [#10](https://github.com/khaoksk/v1-self/pull/10) |
-| 2 | Multi-select questions, created in the UI, answered on an "Answer a survey" page | [#11](https://github.com/khaoksk/v1-self/pull/11) |
-| 3 | Comment questions in the shared `value` column | [#12](https://github.com/khaoksk/v1-self/pull/12) |
-| 4 | Re-answer through a private edit link; table shows the latest value, with history | [#13](https://github.com/khaoksk/v1-self/pull/13) |
-| 5 | Display from latest settings: rename/archive options, archive questions, change scales | [#14](https://github.com/khaoksk/v1-self/pull/14) |
-| 6 | Conditional display ("show Q2 only when Q1 > 2") | [#15](https://github.com/khaoksk/v1-self/pull/15) |
+| — | PRD | [#8](https://github.com/khaoksk/feedback-table/pull/8) |
+| 0 | Baseline table: new endpoint, filters, pagination, 10K data, CI | [#9](https://github.com/khaoksk/feedback-table/pull/9) |
+| 1 | Custom choice labels per survey (and scales other than 1–5) | [#10](https://github.com/khaoksk/feedback-table/pull/10) |
+| 2 | Multi-select questions, created in the UI, answered on an "Answer a survey" page | [#11](https://github.com/khaoksk/feedback-table/pull/11) |
+| 3 | Comment questions in the shared `value` column | [#12](https://github.com/khaoksk/feedback-table/pull/12) |
+| 4 | Re-answer through a private edit link; table shows the latest value, with history | [#13](https://github.com/khaoksk/feedback-table/pull/13) |
+| 5 | Display from latest settings: rename/archive options, archive questions, change scales | [#14](https://github.com/khaoksk/feedback-table/pull/14) |
+| 6 | Conditional display ("show Q2 only when Q1 > 2") | [#15](https://github.com/khaoksk/feedback-table/pull/15) |
 
 Each PR description lists its decisions, tests, an end-to-end check against the real backend, and timings.
 
