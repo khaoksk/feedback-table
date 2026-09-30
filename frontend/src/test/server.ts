@@ -141,6 +141,8 @@ export const handlers = {
       responseUpdates.push({ responseId: Number(params.id), token, body: await request.json() })
       return respond ? respond() : HttpResponse.json({ id: Number(params.id), changed: 1 })
     }),
+  archivedQuestions: (list: unknown[] = []) =>
+    http.get('*/api/surveys/:id/archived-questions/', () => HttpResponse.json(list)),
   archiveQuestion: (respond?: () => Response) =>
     http.delete('*/api/questions/:id/', ({ params }) => {
       archivedQuestions.push(Number(params.id))
@@ -176,6 +178,7 @@ export const server = setupServer(
   handlers.submitResponse(),
   handlers.editResponse(),
   handlers.updateResponse(),
+  handlers.archivedQuestions(),
   handlers.archiveQuestion(),
   handlers.updateOptions(),
 )

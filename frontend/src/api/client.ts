@@ -1,4 +1,4 @@
-import type { FeedbackTablePage, Question, QuestionType, Survey } from './types'
+import type { ArchivedQuestion, FeedbackTablePage, Question, QuestionType, Survey } from './types'
 
 export class ApiError extends Error {
   readonly status: number
@@ -58,6 +58,10 @@ function sendJson<T>(method: 'POST' | 'PUT' | 'DELETE', path: string, body?: unk
     headers: { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
+}
+
+export function fetchArchivedQuestions(surveyId: number, signal?: AbortSignal): Promise<ArchivedQuestion[]> {
+  return request<ArchivedQuestion[]>(apiUrl(`/api/surveys/${surveyId}/archived-questions/`), { signal })
 }
 
 /** Archive a question: it leaves the survey, later questions move up, answers stay (Req 5). */

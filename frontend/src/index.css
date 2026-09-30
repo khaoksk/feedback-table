@@ -732,3 +732,21 @@ tbody tr:hover {
   border-radius: 8px;
   padding: 0 6px;
 }
+
+.archived-questions {
+  margin: 4px 0 12px;
+}
+
+.archived-questions h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.archived-questions ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}

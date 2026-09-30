@@ -1,7 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 
-import { archiveQuestion, updateOptions } from '../../api/client'
+import { archiveQuestion, fetchArchivedQuestions, updateOptions } from '../../api/client'
 import type { Question, Survey } from '../../api/types'
 import { apiErrors } from '../respond/links'
 
@@ -46,11 +46,45 @@ export function QuestionsPanel({ survey, onClose }: Props) {
           </li>
         ))}
       </ol>
+      <ArchivedQuestions surveyId={survey.id} />
       <div className="editor-actions">
         <button type="button" onClick={onClose}>
           Close
         </button>
       </div>
+    </section>
+  )
+}
+
+const archivedDate = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' })
+
+/** Questions archived from this survey: no column, no form field, answers kept. */
+function ArchivedQuestions({ surveyId }: { surveyId: number }) {
+  const archived = useQuery({
+    queryKey: ['archived-questions', surveyId],
+    queryFn: ({ signal }) => fetchArchivedQuestions(surveyId, signal),
+  })
+
+  return (
+    <section className="archived-questions" aria-labelledby="archived-questions-title">
+      <h3 id="archived-questions-title">Archived questions</h3>
+      {archived.isError && <p className="hint">Couldn't load archived questions.</p>}
+      {archived.data?.length === 0 && <p className="hint">None. Every question of this survey is in use.</p>}
+      {archived.data && archived.data.length > 0 && (
+        <ul>
+          {archived.data.map((question) => (
+            <li key={question.id}>
+              <span className="question-text">{question.text}</span>{' '}
+              <span className="qtype">{TYPE_LABEL[question.type]}</span>
+              <span className="hint">
+                {' '}
+                · archived {archivedDate.format(new Date(question.archived_at))} ·{' '}
+                {question.answer_count.toLocaleString()} {question.answer_count === 1 ? 'answer' : 'answers'} kept
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }
@@ -61,6 +95,7 @@ function useRefresh() {
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ['surveys'] }),
       queryClient.invalidateQueries({ queryKey: ['feedback-table'] }),
+      queryClient.invalidateQueries({ queryKey: ['archived-questions'] }),
     ])
 }
 
