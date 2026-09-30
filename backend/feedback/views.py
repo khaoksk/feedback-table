@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Exists, Max, OuterRef, Prefetch, Q
 from django.http import Http404
@@ -11,10 +12,12 @@ from rest_framework.views import APIView
 
 from .display import resolve_answer
 from .models import Answer, AnswerRevision, Customer, Option, Question, Response, Survey, Ticket
+from .questions import active_questions, archive_question, replace_options
 from .scales import rating_labels
 from .serializers import (
     STATUS_ALL,
     FeedbackTableParamsSerializer,
+    OptionsUpdateSerializer,
     QuestionCreateSerializer,
     RatingLabelsSerializer,
     ResponseCreateSerializer,
@@ -79,8 +82,9 @@ def responses_page(request):
 
 def surveys_with_questions():
     # Options include archived ones: old answers still point at them.
+    # Only active questions: archived ones have left the survey (Req 5).
     return Survey.objects.order_by("id").prefetch_related(
-        Prefetch("questions", queryset=Question.objects.order_by("order", "id")),
+        Prefetch("questions", queryset=Question.objects.filter(archived_at__isnull=True).order_by("order", "id")),
         "questions__options",
     )
 
@@ -166,7 +170,7 @@ class SurveyQuestionsView(APIView):
         data = serializer.validated_data
 
         with transaction.atomic():
-            last = survey.questions.aggregate(last=Max("order"))["last"] or 0
+            last = active_questions(survey).aggregate(last=Max("order"))["last"] or 0
             question = Question.objects.create(
                 survey=survey, text=data["text"], type=data["type"], order=last + 1
             )
@@ -203,6 +207,41 @@ class SurveyResponsesView(APIView):
 
         response = create_response(survey, data["email"], data["name"], data["company"], cleaned)
         return ApiResponse({"id": response.id, "edit_token": response.edit_token}, status=status.HTTP_201_CREATED)
+
+
+class QuestionView(APIView):
+    """DELETE archives a question: it leaves the survey, its answers stay (Req 5)."""
+
+    authentication_classes = []  # see SurveyRatingLabelsView
+
+    def delete(self, request, question_id):
+        question = get_object_or_404(Question, pk=question_id, archived_at__isnull=True)
+        try:
+            archive_question(question)
+        except DjangoValidationError as error:
+            raise ValidationError({"question": error.messages})
+        return ApiResponse(status=status.HTTP_204_NO_CONTENT)
+
+
+class QuestionOptionsView(APIView):
+    """PUT the full list of a multi-select question's options (Req 5).
+
+    Listed ids are renamed and reordered, new labels added, and active options
+    left out archived, so old answers show them as removed.
+    """
+
+    authentication_classes = []  # see SurveyRatingLabelsView
+
+    def put(self, request, question_id):
+        question = get_object_or_404(Question, pk=question_id, archived_at__isnull=True)
+        serializer = OptionsUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            replace_options(question, serializer.validated_data["options"])
+        except DjangoValidationError as error:
+            raise ValidationError({"options": error.messages})
+        question = Question.objects.prefetch_related("options").get(pk=question.pk)
+        return ApiResponse(question_payload(question))
 
 
 class ResponseEditView(APIView):
@@ -328,6 +367,8 @@ class FeedbackTableView(GenericAPIView):
                         value=str(params["rating"]),
                         # Only ratings: a comment of "5" is text, not a score.
                         question__type=Question.RATING,
+                        # Positions count active questions only (Req 5).
+                        question__archived_at__isnull=True,
                         **question,
                     )
                 )

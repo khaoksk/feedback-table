@@ -59,6 +59,9 @@ class Question(models.Model):
     text = models.CharField(max_length=255)
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, default=RATING)
     order = models.PositiveIntegerField(default=1)
+    # Set when the question is removed from the survey (Req 5). It leaves
+    # forms and columns; its answers stay. See questions.archive_question.
+    archived_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["order"]

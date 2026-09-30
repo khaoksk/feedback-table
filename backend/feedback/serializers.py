@@ -91,3 +91,22 @@ class ResponseEditSerializer(serializers.Serializer):
     """Body of PUT /api/responses/<id>/edit/?token=...: the answers to change."""
 
     answers = serializers.DictField(child=serializers.JSONField(), allow_empty=False)
+
+
+class OptionSpecSerializer(serializers.Serializer):
+    id = serializers.IntegerField(required=False)
+    label = serializers.CharField(max_length=100)
+
+
+class OptionsUpdateSerializer(serializers.Serializer):
+    """Body of PUT /api/questions/<id>/options/: the full, ordered list of options."""
+
+    options = OptionSpecSerializer(many=True)
+
+    def validate_options(self, options):
+        if len(options) < 2:
+            raise serializers.ValidationError("A multi-select question needs at least 2 options.")
+        folded = [option["label"].casefold() for option in options]
+        if len(set(folded)) != len(folded):
+            raise serializers.ValidationError("Each option needs a different label.")
+        return options
