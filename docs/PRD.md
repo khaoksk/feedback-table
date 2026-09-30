@@ -156,6 +156,8 @@ a new `Answer` row per edit (needs a latest-per-group query and allows duplicate
 - Edge cases in proportions close to the design: ~20% without a ticket, drafts, skipped Q2, anonymous customers, legacy scores
 - Grows with each requirement PR (multi-select, comments, edited answers, conditional questions)
 - `--responses 100000` for performance reporting
+- Runs `ANALYZE` after loading: without it, timings taken right after a bulk load measure plans built on stale statistics (a rating filter at 100K took ~390 ms before and ~50–75 ms after)
+- `python manage.py time_feedback_table` prints the timing report (§9)
 
 ## 9. Quality
 
@@ -196,7 +198,8 @@ Response time is reported rather than gated, because it depends on the machine a
 
 | Trigger | Change |
 |---|---|
-| Late pages get slow (hundreds of thousands to millions of rows) or `COUNT(*)` dominates | Cursor pagination on the existing `(submitted_at, id)` index |
+| Late pages get slow (hundreds of thousands to millions of rows) or `COUNT(*)` dominates | Cursor pagination on the existing `(submitted_at, id)` index. **Measured:** at 100K the last page takes ~195–220 ms against ~29 ms for page 1, because `OFFSET` walks and joins customer/ticket for every skipped row. A cheaper first step is a deferred join: page through ids only, then fetch the 50 rows with their joins. |
+| Rating filter across all surveys gets slow (millions of answers) | Index `Answer (question_id, value, response_id)`. **Measured at 100K and not added:** ~20% faster (59 vs 75 ms median) with a worse p95, not worth an extra index on the largest, most-written table yet. The ~390 ms first seen was stale statistics after bulk load, fixed by `ANALYZE`. |
 | Exact count too expensive | Approximate count (`pg_class.reltuples` / `EXPLAIN`) shown as "about N", or cache counts per filter set |
 | Very long result sets | "Load more" / infinite scroll with virtualised rows |
 | Legacy `/api/responses/` | Fix N+1 without changing its JSON, after adding tests that lock the current shape |
