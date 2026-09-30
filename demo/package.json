@@ -1,0 +1,19 @@
+{
+  "name": "feedback-table-demo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Records the end-to-end demo of the Feedback Table with on-screen annotations.",
+  "scripts": {
+    "login": "tsx src/login.ts",
+    "record": "tsx src/record.ts",
+    "record:app": "tsx src/record.ts --app-only",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "playwright": "^1.63.0",
+    "tsx": "^4.20.0",
+    "typescript": "~6.0.2"
+  }
+}

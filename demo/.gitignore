@@ -1,0 +1,4 @@
+node_modules/
+# GitHub session cookies from `npm run login`: never commit.
+.auth/
+recordings/
