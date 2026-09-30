@@ -10,6 +10,7 @@ TypeScript frontend, through the six backlog requirements in order.
 | Backlog | Issues [#1](https://github.com/khaoksk/feedback-table/issues/1)–[#7](https://github.com/khaoksk/feedback-table/issues/7), one per item, all closed |
 | How I worked with the AI agent | [docs/AI-COLLABORATION.md](docs/AI-COLLABORATION.md) |
 | Judgment calls where the brief was open | [docs/JUDGMENT-CALLS.md](docs/JUDGMENT-CALLS.md) |
+| Demo video (6.5 min, 10K responses) | [Release v1.0](https://github.com/khaoksk/feedback-table/releases/tag/v1.0): [MP4](https://github.com/khaoksk/feedback-table/releases/download/v1.0/feedback-table-demo.mp4) with subtitles and chapters |
 
 ## What was delivered
 
@@ -63,7 +64,18 @@ CI runs all of the above on every pull request, with a Postgres service.
 
 ## Demo
 
-[demo/](demo/README.md) records the end-to-end demo with Playwright, with on-screen captions and highlights at each
+**Watch:** [feedback-table-demo.mp4](https://github.com/khaoksk/feedback-table/releases/download/v1.0/feedback-table-demo.mp4)
+(6 min 34 s, no audio; captions on screen). The [v1.0 release](https://github.com/khaoksk/feedback-table/releases/tag/v1.0)
+also has the subtitles (`.vtt`) and chapter times.
+
+| Time | Chapter |
+|---|---|
+| 0:01 | The problem: the legacy API against the paged table |
+| 0:31 | Table & filters |
+| 1:38 | The six requirements |
+| 4:58 | How it was built: PRs, commits, this AI collaboration note, CI |
+
+**Re-record:** [demo/](demo/README.md) records the end-to-end demo with Playwright, with on-screen captions and highlights at each
 step, plus subtitles and chapter marks: `cd demo && npm install && npm run record:app`.
 
 ## Performance
