@@ -202,3 +202,18 @@ def test_some_selections_include_an_option_removed_since():
     slack = Option.objects.get(label="Slack channel")
     assert slack.archived_at is not None
     assert Answer.objects.filter(value__contains=str(slack.id), question=slack.question).exists()
+
+
+def test_the_comment_shows_only_when_the_first_rating_is_above_two():
+    run(responses=400, seed=7, clear=True)
+
+    comment = Question.objects.get(type=Question.COMMENT)
+    source = comment.condition_question
+    assert (source.text, comment.condition_operator, comment.condition_value) == (
+        "How likely are you to recommend us?", ">", 2,
+    )
+    for answer in Answer.objects.filter(question=comment).select_related("response"):
+        score = Answer.objects.get(response=answer.response, question=source).value
+        # Legacy 0 scores were applied after answering, as if the source changed
+        # later: the comment is kept but hidden (docs/PRD.md §11).
+        assert int(score) > 2 or score == seed_bulk.LEGACY_VALUE
