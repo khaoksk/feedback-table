@@ -10,12 +10,14 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response as ApiResponse
 from rest_framework.views import APIView
 
+from .conditions import condition_active, hidden_questions, set_condition
 from .display import resolve_answer
 from .models import Answer, AnswerRevision, Customer, Option, Question, Response, Survey, Ticket
 from .questions import active_questions, archive_question, replace_options
 from .scales import rating_labels
 from .serializers import (
     STATUS_ALL,
+    ConditionUpdateSerializer,
     FeedbackTableParamsSerializer,
     OptionsUpdateSerializer,
     QuestionCreateSerializer,
@@ -26,6 +28,7 @@ from .serializers import (
 from .submissions import (
     AnswerErrors,
     answer_as_input,
+    check_conditions,
     clean_answers,
     create_response,
     edit_response,
@@ -89,12 +92,24 @@ def surveys_with_questions():
     )
 
 
-def question_payload(question):
+def question_payload(question, active_question_ids=None):
+    """A question as the API returns it. `active_question_ids` (the survey's active
+    questions) tells whether its condition applies; it is looked up when not given.
+    """
+    if active_question_ids is None:
+        active_question_ids = set(active_questions(question.survey).values_list("id", flat=True))
     return {
         "id": question.id,
         "order": question.order,
         "text": question.text,
         "type": question.type,
+        # Null without a condition; `active` is false when the source was archived.
+        "condition": None if question.condition_question_id is None else {
+            "question_id": question.condition_question_id,
+            "operator": question.condition_operator,
+            "value": question.condition_value,
+            "active": condition_active(question, active_question_ids),
+        },
         # Only choices a respondent can still pick; archived ones stay out.
         "options": [
             {"id": option.id, "label": option.label, "order": option.order}
@@ -105,6 +120,7 @@ def question_payload(question):
 
 
 def survey_payload(survey):
+    active_ids = {question.id for question in survey.questions.all()}
     return {
         "name": survey.name,
         # The scale in score order; `custom_labels` is false when the survey
@@ -113,7 +129,7 @@ def survey_payload(survey):
             {"score": score, "label": label} for score, label in rating_labels(survey).items()
         ],
         "custom_labels": survey.rating_labels is not None,
-        "questions": [question_payload(question) for question in survey.questions.all()],
+        "questions": [question_payload(question, active_ids) for question in survey.questions.all()],
     }
 
 
@@ -202,6 +218,7 @@ class SurveyResponsesView(APIView):
         data = serializer.validated_data
         try:
             cleaned = clean_answers(survey, data["answers"])
+            check_conditions(survey, cleaned)
         except AnswerErrors as error:
             raise ValidationError({"answers": error.errors})
 
@@ -247,6 +264,28 @@ class QuestionView(APIView):
         except DjangoValidationError as error:
             raise ValidationError({"question": error.messages})
         return ApiResponse(status=status.HTTP_204_NO_CONTENT)
+
+
+class QuestionConditionView(APIView):
+    """PUT {"condition": {"question_id", "operator", "value"}} to show a question only
+    when an earlier rating meets it, or {"condition": null} to always show it (Req 6)."""
+
+    authentication_classes = []  # see SurveyRatingLabelsView
+
+    def put(self, request, question_id):
+        question = get_object_or_404(Question, pk=question_id, archived_at__isnull=True)
+        serializer = ConditionUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        condition = serializer.validated_data["condition"]
+        try:
+            if condition is None:
+                set_condition(question, None, None, None)
+            else:
+                set_condition(question, condition["question_id"], condition["operator"], condition["value"])
+        except DjangoValidationError as error:
+            raise ValidationError({"condition": error.messages})
+        question = Question.objects.prefetch_related("options").get(pk=question.pk)
+        return ApiResponse(question_payload(question))
 
 
 class QuestionOptionsView(APIView):
@@ -310,6 +349,8 @@ class ResponseEditView(APIView):
         serializer.is_valid(raise_exception=True)
         try:
             cleaned = clean_answers(response.survey, serializer.validated_data["answers"])
+            saved = {answer.question_id: answer.value for answer in response.answers.all()}
+            check_conditions(response.survey, cleaned, existing=saved)
         except AnswerErrors as error:
             raise ValidationError({"answers": error.errors})
 
@@ -409,6 +450,7 @@ class FeedbackTableView(GenericAPIView):
 
     def _row(self, response, survey, labels, options):
         answers = {answer.question_id: answer for answer in response.answers.all()}
+        hidden = hidden_questions(survey.questions.all(), {qid: a.value for qid, a in answers.items()})
         return {
             "id": response.id,
             "submitted_at": response.submitted_at,
@@ -425,10 +467,19 @@ class FeedbackTableView(GenericAPIView):
             ),
             "survey_id": response.survey_id,
             "answers": {
-                str(question.id): self._cell(question, answers.get(question.id), labels, options[question.id])
+                str(question.id): (
+                    self._hidden_cell(answers.get(question.id))
+                    if question.id in hidden
+                    else self._cell(question, answers.get(question.id), labels, options[question.id])
+                )
                 for question in survey.questions.all()
             },
         }
+
+    def _hidden_cell(self, answer):
+        # The design's "blank — condition not met". A kept answer (from before
+        # the source was re-answered) stays in `value` but is not shown.
+        return {"value": answer.value if answer else None, "display": None, "state": "condition_not_met"}
 
     def _cell(self, question, answer, labels, options):
         cell = resolve_answer(question, answer.value if answer else None, labels, options)

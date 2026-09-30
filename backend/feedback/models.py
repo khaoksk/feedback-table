@@ -62,6 +62,13 @@ class Question(models.Model):
     # Set when the question is removed from the survey (Req 5). It leaves
     # forms and columns; its answers stay. See questions.archive_question.
     archived_at = models.DateTimeField(null=True, blank=True)
+    # Conditional display (Req 6): show only when the source question's
+    # rating meets `condition_operator condition_value`. See conditions.py.
+    condition_question = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="dependents"
+    )
+    condition_operator = models.CharField(max_length=2, blank=True)
+    condition_value = models.IntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ["order"]

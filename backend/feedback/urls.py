@@ -22,4 +22,9 @@ urlpatterns = [
     path("api/responses/<int:response_id>/edit/", views.ResponseEditView.as_view(), name="response_edit"),
     path("api/questions/<int:question_id>/", views.QuestionView.as_view(), name="question"),
     path("api/questions/<int:question_id>/options/", views.QuestionOptionsView.as_view(), name="question_options"),
+    path(
+        "api/questions/<int:question_id>/condition/",
+        views.QuestionConditionView.as_view(),
+        name="question_condition",
+    ),
 ]
