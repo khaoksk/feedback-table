@@ -1,7 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
 
-from .factories import QuestionFactory, SurveyFactory
+from .factories import DEFAULT_SCALE, QuestionFactory, SurveyFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -21,6 +21,8 @@ def test_lists_every_survey_with_ordered_questions(django_assert_num_queries):
     assert data[0] == {
         "id": first.id,
         "name": "CSAT",
+        "rating_scale": DEFAULT_SCALE,
+        "custom_labels": False,
         "questions": [
             {"id": q1.id, "order": 1, "text": "How satisfied?", "type": "rating"},
             {"id": q2.id, "order": 2, "text": "How fast?", "type": "rating"},
