@@ -10,6 +10,7 @@ interface Props {
   ratingScores: number[]
   onEditLabels: () => void
   onAddQuestion: () => void
+  onEditQuestions: () => void
   onSearchText: (text: string) => void
   onSurvey: (surveyId: number | null) => void
   onRating: (rating: number | null) => void
@@ -57,6 +58,9 @@ export function Toolbar(props: Props) {
           </button>
           <button type="button" className="link-button" onClick={props.onAddQuestion}>
             Add question
+          </button>
+          <button type="button" className="link-button" onClick={props.onEditQuestions}>
+            Edit questions
           </button>
         </>
       )}

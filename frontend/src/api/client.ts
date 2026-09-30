@@ -34,6 +34,8 @@ async function request<T>(url: URL, init: RequestInit): Promise<T> {
     const body: unknown = await response.json().catch(() => null)
     throw new ApiError(response.status, `${url.pathname} returned ${response.status}`, collectMessages(body))
   }
+  // 204 No Content (e.g. archiving) has no body to parse.
+  if (response.status === 204) return undefined as T
   return (await response.json()) as T
 }
 
@@ -50,12 +52,25 @@ export function updateRatingLabels(surveyId: number, labels: Record<string, stri
   return sendJson<Survey>('PUT', `/api/surveys/${surveyId}/rating-labels/`, { labels })
 }
 
-function sendJson<T>(method: 'POST' | 'PUT', path: string, body: unknown): Promise<T> {
+function sendJson<T>(method: 'POST' | 'PUT' | 'DELETE', path: string, body?: unknown): Promise<T> {
   return request<T>(apiUrl(path), {
     method,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(body),
   })
+}
+
+/** Archive a question: it leaves the survey, later questions move up, answers stay (Req 5). */
+export function archiveQuestion(questionId: number): Promise<void> {
+  return sendJson<void>('DELETE', `/api/questions/${questionId}/`)
+}
+
+/** Replace a multi-select question's options; ones left out are archived, not deleted. */
+export function updateOptions(
+  questionId: number,
+  options: ({ id: number; label: string } | { label: string })[],
+): Promise<Question> {
+  return sendJson<Question>('PUT', `/api/questions/${questionId}/options/`, { options })
 }
 
 export function createQuestion(

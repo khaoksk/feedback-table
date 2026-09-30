@@ -36,6 +36,7 @@ src/
     FeedbackTablePage.tsx  data loading, debounced search, wiring
     LabelEditor.tsx        rename a survey's rating labels (PUT /api/surveys/<id>/rating-labels/)
     QuestionForm.tsx       add a rating or multi-select question (POST /api/surveys/<id>/questions/)
+    QuestionsPanel.tsx     archive questions and edit multi-select options (Req 5)
     Toolbar.tsx, FeedbackTable.tsx, AnswerCell.tsx, Pagination.tsx
   features/respond/        "Answer a survey" at /respond, and the private edit link /respond/<id>?token=...
     ResponseForm.tsx       the questions as fields, shared by answering and editing
