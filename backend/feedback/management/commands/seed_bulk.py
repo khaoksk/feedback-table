@@ -18,18 +18,26 @@ from django.db.models import OuterRef, Subquery
 from django.utils import timezone
 
 from feedback.models import Answer, AnswerRevision, Customer, Option, Question, Response, Survey, Ticket
+from feedback.questions import archive_question
 from feedback.scales import normalize_rating_labels
 from feedback.validators import serialize_selection, validate_comment, validate_rating, validate_selection
 
 COMMENT = "comment"
+ARCHIVED = "archived"
+# Options that were removed from their question after answers used them (Req 5).
+ARCHIVED_OPTIONS = {"Slack channel"}
 
 # (name, questions, rating labels or None for the defaults). A question is
-# rating text, (text, [options]) for multi-select, or (text, COMMENT).
+# rating text, (text, [options]) for multi-select, (text, COMMENT), or
+# (text, ARCHIVED) for a rating question that was later archived (Req 5).
 SURVEYS = [
     (
         "Post-Support CSAT",
         [
             "How satisfied were you with the support you received?",
+            # Answered for a while, then archived: its answers stay but it has
+            # no column, and the speed question moves up to Q2.
+            ("How friendly was the agent?", ARCHIVED),
             "How would you rate the speed of our response?",
         ],
         None,
@@ -44,7 +52,7 @@ SURVEYS = [
             # The design reference's Req 2 example.
             (
                 "What made the biggest difference?",
-                ["Docs", "Support team", "Pricing", "Kickoff call", "Product itself"],
+                ["Docs", "Support team", "Pricing", "Kickoff call", "Product itself", "Slack channel"],
             ),
         ],
         {1: "Meh", 2: "Rough", 3: "Fine", 4: "Nice", 5: "Awesome"},
@@ -107,6 +115,9 @@ COMMENTS = [
     ),
 ]
 COMMENT_ANSWER_RATE = 0.4  # comments are optional; most people skip them
+# Multi-select answers that also picked an option removed since (Req 5).
+REMOVED_OPTION_RATE = 0.08
+ARCHIVED_QUESTION_AGE = timedelta(days=45)
 
 # How many options a multi-select answer picks.
 SELECTION_SIZE_WEIGHTS = {1: 45, 2: 35, 3: 20}
@@ -163,7 +174,7 @@ class Command(BaseCommand):
                 f"({stats['customers']} customers, {stats['tickets']} tickets, "
                 f"{stats['no_ticket']} without ticket, {stats['drafts']} drafts, "
                 f"{stats['skipped']} skipped answers, {stats['legacy']} legacy scores, "
-                f"{stats['edited']} edited answers)."
+                f"{stats['edited']} edited answers, {stats['removed_options']} answers with a removed option)."
             )
         )
 
@@ -207,6 +218,7 @@ class Generator:
         stats = {
             "customers": len(customers), "tickets": len(tickets), "responses": 0,
             "answers": 0, "no_ticket": 0, "drafts": 0, "skipped": 0, "legacy": 0, "edited": 0,
+            "removed_options": 0,
         }
         answer_ids = []
 
@@ -271,21 +283,31 @@ class Generator:
             survey.question_list = []
             for order, spec in enumerate(specs, start=1):
                 text, options = (spec, None) if isinstance(spec, str) else spec
-                if options is None:
-                    question_type = Question.RATING
+                archived = options == ARCHIVED
+                if options is None or archived:
+                    question_type, options = Question.RATING, None
                 elif options == COMMENT:
                     question_type, options = Question.COMMENT, None
                 else:
                     question_type = Question.MULTISELECT
                 question = Question.objects.create(survey=survey, text=text, order=order, type=question_type)
-                question.option_ids = [
-                    option.id
-                    for option in Option.objects.bulk_create(
-                        Option(question=question, label=label, order=position)
-                        for position, label in enumerate(options or [], start=1)
+                created = Option.objects.bulk_create(
+                    Option(
+                        question=question,
+                        label=label,
+                        order=position,
+                        archived_at=self.anchor - ARCHIVED_QUESTION_AGE if label in ARCHIVED_OPTIONS else None,
                     )
-                ]
+                    for position, label in enumerate(options or [], start=1)
+                )
+                question.option_ids = [o.id for o in created if o.archived_at is None]
+                question.archived_option_ids = [o.id for o in created if o.archived_at is not None]
+                question.archive_later = archived
                 survey.question_list.append(question)
+            for question in survey.question_list:
+                if question.archive_later:
+                    # Renumbers the survey's later questions, as the API would.
+                    archive_question(question, when=self.anchor - ARCHIVED_QUESTION_AGE)
             surveys[survey.id] = survey
         return surveys
 
@@ -318,6 +340,11 @@ class Generator:
             elif question.type == Question.MULTISELECT:
                 size = self.rng.choices(list(SELECTION_SIZE_WEIGHTS), weights=SELECTION_SIZE_WEIGHTS.values())[0]
                 ids = validate_selection(self.rng.sample(question.option_ids, size), question.option_ids)
+                # Deliberately after validation, like legacy scores: the option
+                # was valid when chosen and has been removed since.
+                if question.archived_option_ids and self.rng.random() < REMOVED_OPTION_RATE:
+                    ids.append(self.rng.choice(question.archived_option_ids))
+                    stats["removed_options"] += 1
                 value = serialize_selection(ids)
             else:
                 value = str(self.rng.choices(list(RATING_WEIGHTS), weights=RATING_WEIGHTS.values())[0])
