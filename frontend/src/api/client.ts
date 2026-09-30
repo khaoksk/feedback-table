@@ -1,4 +1,4 @@
-import type { FeedbackTablePage, Survey } from './types'
+import type { FeedbackTablePage, Question, QuestionType, Survey } from './types'
 
 export class ApiError extends Error {
   readonly status: number
@@ -47,9 +47,32 @@ export function fetchFeedbackTable(params: URLSearchParams, signal?: AbortSignal
 
 /** Set a survey's labels ({score: label}); null resets to the defaults. */
 export function updateRatingLabels(surveyId: number, labels: Record<string, string> | null): Promise<Survey> {
-  return request<Survey>(apiUrl(`/api/surveys/${surveyId}/rating-labels/`), {
-    method: 'PUT',
+  return sendJson<Survey>('PUT', `/api/surveys/${surveyId}/rating-labels/`, { labels })
+}
+
+function sendJson<T>(method: 'POST' | 'PUT', path: string, body: unknown): Promise<T> {
+  return request<T>(apiUrl(path), {
+    method,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ labels }),
+    body: JSON.stringify(body),
   })
+}
+
+export function createQuestion(
+  surveyId: number,
+  question: { text: string; type: QuestionType; options: string[] },
+): Promise<Question> {
+  return sendJson<Question>('POST', `/api/surveys/${surveyId}/questions/`, question)
+}
+
+/** Answers map question id to a score (rating) or option ids (multi-select). */
+export interface ResponseSubmission {
+  name: string
+  email: string
+  company: string
+  answers: Record<string, number | number[]>
+}
+
+export function submitResponse(surveyId: number, submission: ResponseSubmission): Promise<{ id: number }> {
+  return sendJson<{ id: number }>('POST', `/api/surveys/${surveyId}/responses/`, submission)
 }

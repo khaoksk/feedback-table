@@ -24,8 +24,8 @@ export const SURVEYS: Survey[] = [
     rating_scale: DEFAULT_SCALE,
     custom_labels: false,
     questions: [
-      { id: 11, order: 1, text: 'How satisfied were you?', type: 'rating' },
-      { id: 12, order: 2, text: 'How fast was our reply?', type: 'rating' },
+      { id: 11, order: 1, text: 'How satisfied were you?', type: 'rating', options: [] },
+      { id: 12, order: 2, text: 'How fast was our reply?', type: 'rating', options: [] },
     ],
   },
   {
@@ -34,9 +34,29 @@ export const SURVEYS: Survey[] = [
     rating_scale: TEN_POINT_SCALE,
     custom_labels: true,
     questions: [
-      { id: 21, order: 1, text: 'How likely are you to recommend us?', type: 'rating' },
-      { id: 22, order: 2, text: 'How well does it fit?', type: 'rating' },
-      { id: 23, order: 3, text: 'Value for money?', type: 'rating' },
+      { id: 21, order: 1, text: 'How likely are you to recommend us?', type: 'rating', options: [] },
+      { id: 22, order: 2, text: 'How well does it fit?', type: 'rating', options: [] },
+      { id: 23, order: 3, text: 'Value for money?', type: 'rating', options: [] },
+    ],
+  },
+  {
+    id: 3,
+    name: 'Onboarding CSAT',
+    rating_scale: DEFAULT_SCALE,
+    custom_labels: false,
+    questions: [
+      { id: 31, order: 1, text: 'How easy was it to get started?', type: 'rating', options: [] },
+      {
+        id: 32,
+        order: 2,
+        text: 'What made the biggest difference?',
+        type: 'multiselect',
+        options: [
+          { id: 301, label: 'Docs', order: 1 },
+          { id: 302, label: 'Support team', order: 2 },
+          { id: 303, label: 'Kickoff call', order: 3 },
+        ],
+      },
     ],
   },
 ]
@@ -67,6 +87,10 @@ export const tableRequests: URL[] = []
 /** Bodies of PUT /api/surveys/<id>/rating-labels/ requests seen during a test. */
 export const labelUpdates: { surveyId: number; labels: Record<string, string> | null }[] = []
 
+/** Bodies of POST .../questions/ and .../responses/ requests seen during a test. */
+export const createdQuestions: { surveyId: number; body: unknown }[] = []
+export const submittedResponses: { surveyId: number; body: unknown }[] = []
+
 export const handlers = {
   surveys: (surveys: Survey[] = SURVEYS) => http.get('*/api/surveys/', () => HttpResponse.json(surveys)),
   table: (respond: (url: URL) => FeedbackTablePage | Response = () => page([row()])) =>
@@ -75,6 +99,17 @@ export const handlers = {
       tableRequests.push(url)
       const body = respond(url)
       return body instanceof Response ? body : HttpResponse.json(body)
+    }),
+  createQuestion: (respond?: () => Response) =>
+    http.post('*/api/surveys/:id/questions/', async ({ params, request }) => {
+      createdQuestions.push({ surveyId: Number(params.id), body: await request.json() })
+      if (respond) return respond()
+      return HttpResponse.json({ id: 99, order: 3, text: 'New', type: 'rating', options: [] }, { status: 201 })
+    }),
+  submitResponse: (respond?: () => Response) =>
+    http.post('*/api/surveys/:id/responses/', async ({ params, request }) => {
+      submittedResponses.push({ surveyId: Number(params.id), body: await request.json() })
+      return respond ? respond() : HttpResponse.json({ id: 501 }, { status: 201 })
     }),
   updateLabels: (respond?: (surveyId: number) => Response) =>
     http.put('*/api/surveys/:id/rating-labels/', async ({ params, request }) => {
@@ -93,7 +128,13 @@ export const handlers = {
     }),
 }
 
-export const server = setupServer(handlers.surveys(), handlers.table(), handlers.updateLabels())
+export const server = setupServer(
+  handlers.surveys(),
+  handlers.table(),
+  handlers.updateLabels(),
+  handlers.createQuestion(),
+  handlers.submitResponse(),
+)
 
 export function lastTableParams(): URLSearchParams {
   const last = tableRequests.at(-1)
@@ -104,4 +145,6 @@ export function lastTableParams(): URLSearchParams {
 export function resetTableRequests() {
   tableRequests.length = 0
   labelUpdates.length = 0
+  createdQuestions.length = 0
+  submittedResponses.length = 0
 }

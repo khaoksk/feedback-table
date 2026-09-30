@@ -9,6 +9,7 @@ interface Props {
   /** Scores offered as chips: the selected survey's scale, or all scales seen. */
   ratingScores: number[]
   onEditLabels: () => void
+  onAddQuestion: () => void
   onSearchText: (text: string) => void
   onSurvey: (surveyId: number | null) => void
   onRating: (rating: number | null) => void
@@ -50,9 +51,14 @@ export function Toolbar(props: Props) {
         ))}
       </select>
       {filters.survey !== null && (
-        <button type="button" className="link-button" onClick={props.onEditLabels}>
-          Edit labels
-        </button>
+        <>
+          <button type="button" className="link-button" onClick={props.onEditLabels}>
+            Edit labels
+          </button>
+          <button type="button" className="link-button" onClick={props.onAddQuestion}>
+            Add question
+          </button>
+        </>
       )}
 
       <label className="visually-hidden" htmlFor="status">

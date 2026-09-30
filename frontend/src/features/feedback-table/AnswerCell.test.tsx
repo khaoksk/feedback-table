@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { AnswerCell as AnswerCellData, Question } from '../../api/types'
 import { AnswerCell } from './AnswerCell'
 
-const question: Question = { id: 11, order: 1, text: 'How satisfied were you?', type: 'rating' }
+const question: Question = { id: 11, order: 1, text: 'How satisfied were you?', type: 'rating', options: [] }
 
 const ONE_TO_FIVE = [1, 2, 3, 4, 5]
 
@@ -100,5 +100,53 @@ describe('AnswerCell on a custom scale', () => {
     renderCell({ value: '4', display: 'Nice', state: 'ok' })
 
     expect(screen.getByText('4 · Nice')).toHaveClass('green')
+  })
+})
+
+describe('AnswerCell for multi-select answers', () => {
+  const multiselect: Question = { id: 32, order: 2, text: 'What helped?', type: 'multiselect', options: [] }
+
+  it('shows each chosen option as a chip', () => {
+    renderCell(
+      {
+        value: '[301, 303]',
+        display: 'Docs, Kickoff call',
+        state: 'ok',
+        selections: [
+          { id: 301, label: 'Docs', removed: false },
+          { id: 303, label: 'Kickoff call', removed: false },
+        ],
+      },
+      { question: multiselect },
+    )
+
+    expect(screen.getByText('Docs')).toHaveClass('chip')
+    expect(screen.getByText('Kickoff call')).toHaveClass('chip')
+    expect(screen.getByText('Docs')).not.toHaveClass('removed')
+  })
+
+  it('marks an option removed since the answer was given', () => {
+    renderCell(
+      {
+        value: '[301, 309]',
+        display: 'Docs, Slack channel',
+        state: 'removed_option',
+        selections: [
+          { id: 301, label: 'Docs', removed: false },
+          { id: 309, label: 'Slack channel', removed: true },
+        ],
+      },
+      { question: multiselect },
+    )
+
+    const removed = screen.getByText('Slack channel')
+    expect(removed).toHaveClass('chip', 'removed')
+    expect(removed).toHaveAttribute('title', 'Option removed from current survey settings')
+  })
+
+  it('treats a malformed multi-select value as invalid', () => {
+    renderCell({ value: 'Docs', display: null, state: 'invalid' }, { question: multiselect })
+
+    expect(screen.getByText('Invalid')).toBeInTheDocument()
   })
 })
