@@ -31,10 +31,11 @@ cd demo
 npm install
 npx playwright install chromium
 
-npm run login        # once: log in to GitHub in the Chrome window that opens (the repo is private)
 npm run record       # all four parts
-npm run record:app   # parts 1–3 only, no GitHub login needed
+npm run record:app   # parts 1–3 only, without the GitHub part
 ```
+
+The repo is public, so no GitHub login is needed. `npm run login` is optional (see [GitHub session](#github-session)).
 
 Extra flags go after `--`, for example `npm run record -- --headless`:
 
@@ -59,6 +60,9 @@ Files go to `recordings/` (gitignored), named `demo-<timestamp>`:
 The video has no audio, so you can record a voice-over on top of it.
 
 ## GitHub session
+
+Optional. Part 4 records GitHub logged out by default. A saved session changes only GitHub's header (your avatar
+and menus). You also need one if the repo is ever made private again.
 
 Google sign-in refuses browsers that Playwright controls. So `npm run login` opens your installed Chrome (or Edge)
 as a normal browser, with a separate profile in `.auth/browser-profile/`. Log in there any way you like: password,

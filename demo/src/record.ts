@@ -20,9 +20,9 @@ const skipReseed = args.has('--no-reseed')
 const SECTIONS = ['The problem', 'Table & filters', 'Six requirements', 'How it was built']
 const VIEWPORT = { width: 1440, height: 900 }
 
-if (!appOnly && !existsSync(AUTH_FILE)) {
-  throw new Error('No GitHub session for the private repo. Run `npm run login` first, or `npm run record:app`.')
-}
+// The repo is public, so part 4 works logged out; a saved session is used if
+// there is one (it only changes GitHub's header, e.g. your avatar).
+const githubSession = !appOnly && existsSync(AUTH_FILE) ? AUTH_FILE : undefined
 await checkServers()
 if (!skipReseed) reseed()
 const { table: timingTable, timings } = measure()
@@ -35,7 +35,7 @@ const browser = await chromium.launch({ headless, slowMo: 40 })
 const context = await browser.newContext({
   viewport: VIEWPORT,
   recordVideo: { dir: RECORDINGS_DIR, size: VIEWPORT },
-  storageState: appOnly ? undefined : AUTH_FILE,
+  storageState: githubSession,
 })
 // tsx wraps named functions in a `__name` helper that the page lacks; shim it.
 await context.addInitScript({ content: `var __name = (f) => f; (${installOverlay.toString()})()` })
