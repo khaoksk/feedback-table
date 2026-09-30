@@ -85,3 +85,9 @@ class ResponseCreateSerializer(serializers.Serializer):
     email = serializers.EmailField()
     company = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
     answers = serializers.DictField(child=serializers.JSONField(), allow_empty=False)
+
+
+class ResponseEditSerializer(serializers.Serializer):
+    """Body of PUT /api/responses/<id>/edit/?token=...: the answers to change."""
+
+    answers = serializers.DictField(child=serializers.JSONField(), allow_empty=False)

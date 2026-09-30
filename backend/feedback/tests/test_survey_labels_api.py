@@ -111,7 +111,7 @@ def test_each_survey_on_a_page_uses_its_own_labels(client, django_assert_num_que
         Answer.objects.create(response=response, question=question, value="5")
         rows[response.id] = question.id
 
-    with django_assert_num_queries(6):
+    with django_assert_num_queries(7):
         results = client.get("/api/feedback-table/").json()["results"]
 
     displays = {row["survey_id"]: row["answers"][str(rows[row["id"]])]["display"] for row in results}

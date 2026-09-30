@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from .scales import normalize_rating_labels, rating_scale
 from .validators import validate_comment, validate_rating, validate_selection
@@ -111,6 +112,9 @@ class Response(models.Model):
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default=STATUS_COMPLETED
     )
+    # Secret in the respondent's private edit link (Req 4). Null for responses
+    # that did not come through the respond page, which cannot be edited.
+    edit_token = models.CharField(max_length=64, null=True, blank=True, editable=False)
 
     class Meta:
         # The feedback table pages through responses newest first, usually
@@ -165,3 +169,25 @@ class Answer(models.Model):
 
     def __str__(self):
         return f"Answer #{self.pk}"
+
+
+class AnswerRevision(models.Model):
+    """A value an answer had before the respondent changed it (Req 4).
+
+    The answer itself always holds the latest value; revisions keep every
+    earlier one, oldest first, so the table can show the original.
+    """
+
+    answer = models.ForeignKey(Answer, on_delete=models.CASCADE, related_name="revisions")
+    value = models.TextField()
+    # When this value was given (the answer's time before it was replaced).
+    answered_at = models.DateTimeField()
+    # default rather than auto_now_add: bulk_create (seed_bulk) must be able
+    # to set historical times, and auto_now_add would overwrite them.
+    replaced_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["answered_at", "id"]
+
+    def __str__(self):
+        return f"Revision #{self.pk} of answer #{self.answer_id}"
