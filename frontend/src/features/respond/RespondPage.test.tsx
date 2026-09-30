@@ -120,3 +120,39 @@ describe('RespondPage', () => {
     await waitFor(() => expect(within(form).getByRole('button', { name: 'Submit response' })).toBeDisabled())
   })
 })
+
+describe('RespondPage comments (Req 3)', () => {
+  it('offers a text box with a 2,000 character counter', async () => {
+    const { user } = await renderRespond()
+    const form = await pickSurvey(user, 'Onboarding CSAT')
+
+    const box = within(form).getByRole('textbox', { name: 'Anything you would add?' })
+    expect(box).toHaveAttribute('maxlength', '2000')
+    expect(within(form).getByText('0 / 2,000')).toBeInTheDocument()
+
+    await user.type(box, 'Great')
+    expect(within(form).getByText('5 / 2,000')).toBeInTheDocument()
+  })
+
+  it('sends the comment as text alongside other answers', async () => {
+    const { user } = await renderRespond()
+    const form = await pickSurvey(user, 'Onboarding CSAT')
+
+    await user.type(within(form).getByLabelText('Email'), 'ada@example.com')
+    await user.click(within(form).getByLabelText('Docs'))
+    await user.type(within(form).getByRole('textbox', { name: 'Anything you would add?' }), '5')
+    await user.click(within(form).getByRole('button', { name: 'Submit response' }))
+
+    await screen.findByRole('status')
+    expect(submittedResponses[0].body).toMatchObject({ answers: { '32': [301], '33': '5' } })
+  })
+
+  it('treats a whitespace-only comment as skipped', async () => {
+    const { user } = await renderRespond()
+    const form = await pickSurvey(user, 'Onboarding CSAT')
+
+    await user.type(within(form).getByRole('textbox', { name: 'Anything you would add?' }), '   ')
+
+    expect(within(form).getByRole('button', { name: 'Submit response' })).toBeDisabled()
+  })
+})

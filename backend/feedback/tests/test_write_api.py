@@ -55,7 +55,7 @@ def test_creates_a_rating_question_without_options(client):
     "body, field",
     [
         ({"text": "", "type": "rating"}, "text"),
-        ({"text": "Q", "type": "comment"}, "type"),
+        ({"text": "Q", "type": "essay"}, "type"),
         ({"text": "Q", "type": "multiselect", "options": ["Only one"]}, "options"),
         ({"text": "Q", "type": "multiselect"}, "options"),
         ({"text": "Q", "type": "multiselect", "options": ["Docs", "docs"]}, "options"),

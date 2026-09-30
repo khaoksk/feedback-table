@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import type { AnswerCell as AnswerCellData, Question, Selection } from '../../api/types'
 import { toneFor } from './scales'
 
@@ -27,7 +29,11 @@ export function AnswerCell({ question, answer, scale, showQuestionText }: Props)
           <span className="qtype">{question.type}</span>
         </span>
       )}
-      <AnswerValue answer={answer} scale={scale} />
+      {question.type === 'comment' && answer.state === 'ok' ? (
+        <Comment text={answer.display ?? ''} />
+      ) : (
+        <AnswerValue answer={answer} scale={scale} />
+      )}
     </td>
   )
 }
@@ -61,6 +67,24 @@ function AnswerValue({ answer, scale }: { answer: AnswerCellData; scale: number[
       // Only multi-select answers can reference a removed option (handled above).
       return <span className="qcell-blank">{answer.display}</span>
   }
+}
+
+/** Comments longer than this start collapsed to a few lines. */
+export const COMMENT_PREVIEW_CHARS = 140
+
+function Comment({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const long = text.length > COMMENT_PREVIEW_CHARS
+  return (
+    <span className="comment-cell">
+      <span className={`comment${long && !expanded ? ' collapsed' : ''}`}>“{text}”</span>
+      {long && (
+        <button type="button" className="link-button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </span>
+  )
 }
 
 function Chips({ selections }: { selections: Selection[] }) {

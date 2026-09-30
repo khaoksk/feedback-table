@@ -78,6 +78,10 @@ export function QuestionForm({ survey, onClose }: Props) {
           <input type="radio" name="question-type" checked={type === 'rating'} onChange={() => setType('rating')} />
           Rating (uses the survey's scale)
         </label>
+        <label className="inline-choice">
+          <input type="radio" name="question-type" checked={type === 'comment'} onChange={() => setType('comment')} />
+          Comment (free text, up to 2,000 characters)
+        </label>
       </fieldset>
 
       {type === 'multiselect' && (

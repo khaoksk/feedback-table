@@ -19,7 +19,7 @@ export interface AnswerCell {
   selections?: Selection[]
 }
 
-export type QuestionType = 'rating' | 'multiselect'
+export type QuestionType = 'rating' | 'multiselect' | 'comment'
 
 export interface Option {
   id: number

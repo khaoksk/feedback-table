@@ -65,12 +65,12 @@ export function createQuestion(
   return sendJson<Question>('POST', `/api/surveys/${surveyId}/questions/`, question)
 }
 
-/** Answers map question id to a score (rating) or option ids (multi-select). */
+/** Answers map question id to a score (rating), option ids (multi-select) or text (comment). */
 export interface ResponseSubmission {
   name: string
   email: string
   company: string
-  answers: Record<string, number | number[]>
+  answers: Record<string, number | number[] | string>
 }
 
 export function submitResponse(surveyId: number, submission: ResponseSubmission): Promise<{ id: number }> {
