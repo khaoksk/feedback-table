@@ -206,7 +206,10 @@ Response time is reported rather than gated, because it depends on the machine a
 - ~~Column position after a question is archived~~ Decided in Req 5: **renumbered**. Archiving a question moves the survey's later questions up, so there is never an empty column for a question that no longer exists, and position-based filters point at real questions. The archived question keeps its old `order` and its answers; un-archiving is out of scope.
 - ~~How options are edited~~ Decided in Req 5: the UI sends the question's full list of options. Listed ids are renamed and reordered, new labels are added, and active options left out are **archived**, never deleted, so old answers still show them as the dashed "removed" chip.
 - ~~Changing a survey's scale from the UI~~ Decided in Req 5: the label editor can set the scale's range (from 0 or 1, up to 3–10). Scores outside the new range become `legacy` in the table; nothing is rewritten.
-- A conditional question whose source question is archived (Req 6)
+- ~~A conditional question whose source question is archived~~ Decided in Req 6: the condition is **switched off** and the question always shows; the question list says why. The condition is kept, not deleted.
+- ~~Re-answering the source so the condition fails~~ Decided in Req 6: the dependent answer is **kept** (edits never delete), and the table shows `condition_not_met` while the condition fails. If the source is changed back, the kept answer shows again.
+- ~~Source question not answered~~ Decided in Req 6: the condition **fails**, so the question is hidden. "Show when Q1 > 2" cannot be true without a Q1. A legacy score such as `0` is still a number and is compared; an invalid value fails.
+- Answers sent for a question whose condition fails are rejected, on submit and on edit; answers kept from before (see above) stay.
 - ~~Which question types the rating filter offers~~ Decided in Req 2: rating questions only. Across all surveys it filters by position, and a survey whose question at that position is not a rating simply has no matches.
 - ~~How a respondent re-answers~~ Decided in Req 4: a private edit link with a random token. On edit, questions left out keep their answer and answers cannot be removed, so no history is lost; a skipped question can be answered later. Unchanged values create no revision.
 
