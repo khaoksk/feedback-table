@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 
 export const APP_URL = process.env.DEMO_APP_URL ?? 'http://localhost:5173'
 export const API_URL = process.env.DEMO_API_URL ?? 'http://localhost:8000'
-export const REPO_URL = 'https://github.com/khaoksk/v1-self'
+export const REPO_URL = 'https://github.com/khaoksk/feedback-table'
 
 const BACKEND_DIR = fileURLToPath(new URL('../../backend', import.meta.url))
 
