@@ -8,7 +8,7 @@ from django.db.models import Count, F
 
 from feedback.management.commands import seed_bulk
 from feedback.models import Answer, Customer, Question, Response, Survey
-from feedback.validators import validate_selection
+from feedback.validators import validate_comment, validate_selection
 
 from .factories import ResponseFactory
 
@@ -148,3 +148,15 @@ def test_legacy_scores_only_land_on_rating_answers():
     legacy = Answer.objects.filter(value=seed_bulk.LEGACY_VALUE)
     assert legacy.exists()
     assert not legacy.exclude(question__type=Question.RATING).exists()
+
+
+def test_quarterly_check_in_has_an_optional_comment_question():
+    run(responses=300, clear=True)
+
+    question = Question.objects.get(type=Question.COMMENT)
+    assert (question.survey.name, question.order) == ("Quarterly Check-in", 4)
+    answers = Answer.objects.filter(question=question)
+    asked = Response.objects.filter(survey=question.survey).count()
+    assert 0 < answers.count() < asked  # optional: most respondents skip it
+    for answer in answers:
+        assert validate_comment(answer.value) == answer.value

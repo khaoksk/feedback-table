@@ -19,10 +19,12 @@ from django.utils import timezone
 
 from feedback.models import Answer, Customer, Option, Question, Response, Survey, Ticket
 from feedback.scales import normalize_rating_labels
-from feedback.validators import serialize_selection, validate_rating, validate_selection
+from feedback.validators import serialize_selection, validate_comment, validate_rating, validate_selection
+
+COMMENT = "comment"
 
 # (name, questions, rating labels or None for the defaults). A question is
-# either rating text, or (text, [options]) for a multi-select question.
+# rating text, (text, [options]) for multi-select, or (text, COMMENT).
 SURVEYS = [
     (
         "Post-Support CSAT",
@@ -47,13 +49,16 @@ SURVEYS = [
         ],
         {1: "Meh", 2: "Rough", 3: "Fine", 4: "Nice", 5: "Awesome"},
     ),
-    # One longer survey, so the table has a Q3 column that the others leave empty.
+    # The longest survey, so the table has columns that shorter surveys leave
+    # empty (2, 3 and 4 questions across the three surveys).
     (
         "Quarterly Check-in",
         [
             "How likely are you to recommend us?",
             "How well does the product fit your needs?",
             "How would you rate the value for money?",
+            # The design reference's Req 3 example.
+            ("Anything you would add?", COMMENT),
         ],
         None,
     ),
@@ -83,6 +88,26 @@ TICKET_SUBJECTS = [
 
 # Weighted towards positive scores, as CSAT data usually is.
 RATING_WEIGHTS = {1: 5, 2: 8, 3: 15, 4: 35, 5: 37}
+# Free-text answers, including ones that look like scores, non-English text
+# and a long one, so the table has to render them as text.
+COMMENTS = [
+    "Support was quick, thanks!",
+    "Appreciate the quick turnaround.",
+    "Nothing major, just a bit slow to respond.",
+    "Took a couple of tries to get the export format right.",
+    "5",
+    "10/10 would recommend",
+    "บริการดีมาก ขอบคุณครับ",
+    "The agent was great.\nThe wait before reaching them was not.",
+    (
+        "Long story short: the first reply came fast, but the fix needed three follow-ups, and each time "
+        "I had to explain the setup again because the context was not carried over between agents. Once "
+        "it reached someone who knew the billing module it was solved in minutes. A shared case history "
+        "would have saved everyone a lot of time."
+    ),
+]
+COMMENT_ANSWER_RATE = 0.4  # comments are optional; most people skip them
+
 # How many options a multi-select answer picks.
 SELECTION_SIZE_WEIGHTS = {1: 45, 2: 35, 3: 20}
 
@@ -235,10 +260,13 @@ class Generator:
             survey.question_list = []
             for order, spec in enumerate(specs, start=1):
                 text, options = (spec, None) if isinstance(spec, str) else spec
-                question = Question.objects.create(
-                    survey=survey, text=text, order=order,
-                    type=Question.RATING if options is None else Question.MULTISELECT,
-                )
+                if options is None:
+                    question_type = Question.RATING
+                elif options == COMMENT:
+                    question_type, options = Question.COMMENT, None
+                else:
+                    question_type = Question.MULTISELECT
+                question = Question.objects.create(survey=survey, text=text, order=order, type=question_type)
                 question.option_ids = [
                     option.id
                     for option in Option.objects.bulk_create(
@@ -272,7 +300,11 @@ class Generator:
             if question.order > 1 and self.rng.random() < SKIP_LATER_QUESTION_RATE:
                 stats["skipped"] += 1
                 continue
-            if question.type == Question.MULTISELECT:
+            if question.type == Question.COMMENT:
+                if self.rng.random() >= COMMENT_ANSWER_RATE:
+                    continue
+                value = validate_comment(self.rng.choice(COMMENTS))
+            elif question.type == Question.MULTISELECT:
                 size = self.rng.choices(list(SELECTION_SIZE_WEIGHTS), weights=SELECTION_SIZE_WEIGHTS.values())[0]
                 ids = validate_selection(self.rng.sample(question.option_ids, size), question.option_ids)
                 value = serialize_selection(ids)

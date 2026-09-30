@@ -23,6 +23,26 @@ def validate_rating(value, scale=DEFAULT_RATING_SCALE):
         )
 
 
+MAX_COMMENT_LENGTH = 2000
+
+
+def validate_comment(value):
+    """Reject a comment that is not text, is blank, or is over 2,000 characters.
+
+    Returns the text with surrounding whitespace removed, as it is stored.
+    """
+    if not isinstance(value, str):
+        raise ValidationError("A comment must be text.")
+    text = value.strip()
+    if not text:
+        raise ValidationError("A comment cannot be empty.")
+    if len(text) > MAX_COMMENT_LENGTH:
+        raise ValidationError(
+            f"A comment can be at most {MAX_COMMENT_LENGTH:,} characters (this one has {len(text):,})."
+        )
+    return text
+
+
 def parse_selection(value):
     """Read a stored multi-select answer ("[3, 7]") as a list of ids, or None if malformed."""
     try:

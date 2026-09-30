@@ -33,6 +33,9 @@ def resolve_answer(question, value, rating_labels=DEFAULT_RATING_LABELS, options
         return _resolve_rating(value, rating_labels)
     if question.type == Question.MULTISELECT:
         return _resolve_selection(value, options or {})
+    if question.type == Question.COMMENT:
+        # Text, whatever it looks like: a comment of "5" is not a score.
+        return _cell(value, value, OK) if value.strip() else _cell(value, None, INVALID)
     return _cell(value, value, OK)
 
 

@@ -49,7 +49,7 @@ class QuestionCreateSerializer(serializers.Serializer):
     """Body of POST /api/surveys/<id>/questions/."""
 
     text = serializers.CharField(max_length=255)
-    type = serializers.ChoiceField(choices=["rating", "multiselect"])
+    type = serializers.ChoiceField(choices=["rating", "multiselect", "comment"])
     options = serializers.ListField(
         child=serializers.CharField(max_length=100), required=False, default=list
     )
@@ -62,6 +62,10 @@ class QuestionCreateSerializer(serializers.Serializer):
                     {"options": "Rating questions use the survey's scale, not options."}
                 )
             return attrs
+        if attrs["type"] == "comment":
+            if options:
+                raise serializers.ValidationError({"options": "Comment questions take free text, not options."})
+            return attrs
         if len(options) < 2:
             raise serializers.ValidationError({"options": "A multi-select question needs at least 2 options."})
         folded = [option.casefold() for option in options]
@@ -73,8 +77,8 @@ class QuestionCreateSerializer(serializers.Serializer):
 class ResponseCreateSerializer(serializers.Serializer):
     """Body of POST /api/surveys/<id>/responses/.
 
-    `answers` maps question id to a score (rating) or a list of option ids
-    (multi-select); the view checks them against the survey's questions.
+    `answers` maps question id to a score (rating), a list of option ids
+    (multi-select) or text (comment); the view checks them against the survey's questions.
     """
 
     name = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")

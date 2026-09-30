@@ -20,7 +20,7 @@ from .serializers import (
     RatingLabelsSerializer,
     ResponseCreateSerializer,
 )
-from .validators import serialize_selection, validate_rating, validate_selection
+from .validators import serialize_selection, validate_comment, validate_rating, validate_selection
 
 
 class ResponseListView(APIView):
@@ -175,7 +175,8 @@ class SurveyQuestionsView(APIView):
 class SurveyResponsesView(APIView):
     """POST a respondent's answers: {"email", "name", "company", "answers": {question_id: value}}.
 
-    A rating answer is a score, a multi-select answer a list of option ids.
+    A rating answer is a score, a multi-select answer a list of option ids,
+    a comment answer text (trimmed, at most 2,000 characters).
     Questions may be skipped, but at least one must be answered. The customer
     is matched by email (case-insensitive) or created.
     """
@@ -225,6 +226,8 @@ class SurveyResponsesView(APIView):
                         raise DjangoValidationError("A rating must be a whole number.")
                     validate_rating(str(value), range(scale[0], scale[-1] + 1))
                     cleaned.append((question, str(value)))
+                elif question.type == Question.COMMENT:
+                    cleaned.append((question, validate_comment(value)))
                 else:
                     active = {o.id for o in question.options.all() if o.archived_at is None}
                     ids = validate_selection(value, active)

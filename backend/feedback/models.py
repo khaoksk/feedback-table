@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from .scales import normalize_rating_labels, rating_scale
-from .validators import validate_rating, validate_selection
+from .validators import validate_comment, validate_rating, validate_selection
 
 
 class Customer(models.Model):
@@ -45,9 +45,11 @@ class Survey(models.Model):
 class Question(models.Model):
     RATING = "rating"
     MULTISELECT = "multiselect"
+    COMMENT = "comment"
     TYPE_CHOICES = [
         (RATING, "Rating"),
         (MULTISELECT, "Multi-select"),
+        (COMMENT, "Comment"),
     ]
 
     survey = models.ForeignKey(
@@ -156,6 +158,8 @@ class Answer(models.Model):
             elif self.question.type == Question.MULTISELECT:
                 active = self.question.options.filter(archived_at__isnull=True)
                 validate_selection(self.value, set(active.values_list("id", flat=True)))
+            elif self.question.type == Question.COMMENT:
+                self.value = validate_comment(self.value)
         except ValidationError as error:
             raise ValidationError({"value": error.messages})
 
