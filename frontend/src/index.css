@@ -355,3 +355,94 @@ tbody tr:hover {
     flex-wrap: wrap;
   }
 }
+
+/* Label editor (Req 1) */
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.label-editor {
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.label-editor h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.label-editor .hint {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
+.label-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.label-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.label-field .score {
+  min-width: 18px;
+  text-align: right;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.label-field input {
+  width: 130px;
+  height: 32px;
+  border: 0.5px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+
+.label-editor .error {
+  margin: 0 0 12px;
+  padding-left: 28px;
+}
+
+.editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.editor-actions button:not(.link-button) {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 0.5px solid var(--border-strong);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.editor-actions button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.editor-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}

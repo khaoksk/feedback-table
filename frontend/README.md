@@ -32,7 +32,9 @@ src/
     filters.ts             filter state: URL <-> state <-> API parameters
     useUrlFilters.ts       filters stored in the query string (shareable, Back works)
     columns.ts             Q1..Qn column positions
+    scales.ts              rating chips and badge colours from each survey's scale
     FeedbackTablePage.tsx  data loading, debounced search, wiring
+    LabelEditor.tsx        rename a survey's rating labels (PUT /api/surveys/<id>/rating-labels/)
     Toolbar.tsx, FeedbackTable.tsx, AnswerCell.tsx, Pagination.tsx
   test/                    Vitest setup and the MSW mock API
 ```

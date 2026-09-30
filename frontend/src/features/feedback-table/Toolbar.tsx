@@ -1,11 +1,14 @@
 import type { Survey } from '../../api/types'
-import { RATING_VALUES, type Filters, type StatusFilter } from './filters'
+import type { Filters, StatusFilter } from './filters'
 
 interface Props {
   filters: Filters
   surveys: Survey[]
   searchText: string
   ratingOptions: { value: number; label: string }[]
+  /** Scores offered as chips: the selected survey's scale, or all scales seen. */
+  ratingScores: number[]
+  onEditLabels: () => void
   onSearchText: (text: string) => void
   onSurvey: (surveyId: number | null) => void
   onRating: (rating: number | null) => void
@@ -46,6 +49,11 @@ export function Toolbar(props: Props) {
           </option>
         ))}
       </select>
+      {filters.survey !== null && (
+        <button type="button" className="link-button" onClick={props.onEditLabels}>
+          Edit labels
+        </button>
+      )}
 
       <label className="visually-hidden" htmlFor="status">
         Status
@@ -66,7 +74,7 @@ export function Toolbar(props: Props) {
           >
             All ratings
           </button>
-          {RATING_VALUES.map((value) => (
+          {props.ratingScores.map((value) => (
             <button
               key={value}
               type="button"

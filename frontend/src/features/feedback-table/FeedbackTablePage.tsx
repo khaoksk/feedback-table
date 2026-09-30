@@ -5,7 +5,9 @@ import { ApiError, fetchFeedbackTable, fetchSurveys } from '../../api/client'
 import { columnCount } from './columns'
 import { FeedbackTable } from './FeedbackTable'
 import { ratingQuestionOptions, refine, toApiParams, withSurvey } from './filters'
+import { LabelEditor } from './LabelEditor'
 import { Pagination } from './Pagination'
+import { ratingScores } from './scales'
 import { Toolbar } from './Toolbar'
 import { useUrlFilters } from './useUrlFilters'
 
@@ -26,6 +28,8 @@ export function FeedbackTablePage() {
   const allColumns = columnCount(surveys)
   const columns = selectedSurvey ? columnCount([selectedSurvey]) : allColumns
   const ratingOptions = ratingQuestionOptions(surveys, filters.survey, allColumns)
+  const scores = ratingScores(selectedSurvey ? [selectedSurvey] : surveys)
+  const [editingLabels, setEditingLabels] = useState(false)
 
   const apiParams = toApiParams(filters)
   const tableQuery = useQuery({
@@ -64,6 +68,8 @@ export function FeedbackTablePage() {
         surveys={surveys}
         searchText={searchDraft ?? filters.search}
         ratingOptions={ratingOptions}
+        ratingScores={scores}
+        onEditLabels={() => setEditingLabels(true)}
         onSearchText={setSearchDraft}
         onSurvey={(surveyId) => setFilters(withSurvey(filters, surveyId, surveys, allColumns))}
         onRating={(rating) =>
@@ -75,6 +81,10 @@ export function FeedbackTablePage() {
         onStatus={(status) => setFilters(refine(filters, { status }))}
         onTicketless={(ticketless) => setFilters(refine(filters, { ticketless }))}
       />
+
+      {editingLabels && selectedSurvey && (
+        <LabelEditor key={selectedSurvey.id} survey={selectedSurvey} onClose={() => setEditingLabels(false)} />
+      )}
 
       <p className="count" aria-live="polite">
         {!data

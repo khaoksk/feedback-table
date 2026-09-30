@@ -6,7 +6,12 @@ import { AnswerCell } from './AnswerCell'
 
 const question: Question = { id: 11, order: 1, text: 'How satisfied were you?', type: 'rating' }
 
-function renderCell(answer: AnswerCellData | undefined, options: { question?: Question; showQuestionText?: boolean } = {}) {
+const ONE_TO_FIVE = [1, 2, 3, 4, 5]
+
+function renderCell(
+  answer: AnswerCellData | undefined,
+  options: { question?: Question; showQuestionText?: boolean; scale?: number[] } = {},
+) {
   const { container } = render(
     <table>
       <tbody>
@@ -14,6 +19,7 @@ function renderCell(answer: AnswerCellData | undefined, options: { question?: Qu
           <AnswerCell
             question={'question' in options ? options.question : question}
             answer={answer}
+            scale={options.scale ?? ONE_TO_FIVE}
             showQuestionText={options.showQuestionText ?? false}
           />
         </tr>
@@ -71,5 +77,28 @@ describe('AnswerCell', () => {
   it('leaves the question text out otherwise', () => {
     renderCell({ value: '5', display: 'Great', state: 'ok' })
     expect(screen.queryByText('How satisfied were you?')).not.toBeInTheDocument()
+  })
+})
+
+describe('AnswerCell on a custom scale', () => {
+  const zeroToTen = Array.from({ length: 11 }, (_, i) => i)
+
+  it.each([
+    ['10', 'green'],
+    ['8', 'green'],
+    ['7', 'amber'],
+    ['5', 'amber'],
+    ['4', 'red'],
+    ['0', 'red'],
+  ])('colours %s out of 0-10 by its place on the scale (%s)', (value, tone) => {
+    renderCell({ value, display: `${value} of 10`, state: 'ok' }, { scale: zeroToTen })
+
+    expect(screen.getByText(`${value} · ${value} of 10`)).toHaveClass('badge', tone)
+  })
+
+  it('shows the label the backend resolved, custom or not', () => {
+    renderCell({ value: '4', display: 'Nice', state: 'ok' })
+
+    expect(screen.getByText('4 · Nice')).toHaveClass('green')
   })
 })

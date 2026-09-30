@@ -1,12 +1,11 @@
 import type { Survey } from '../../api/types'
+import { ratingScores } from './scales'
 
 export type StatusFilter = 'completed' | 'draft' | 'all'
 export type Ordering = 'newest' | 'oldest'
 
 export const PAGE_SIZES = [25, 50, 100] as const
 export type PageSize = (typeof PAGE_SIZES)[number]
-
-export const RATING_VALUES = [5, 4, 3, 2, 1] as const
 
 /**
  * Everything that decides which rows the table shows. It lives in the URL so
@@ -133,9 +132,11 @@ export function ratingQuestionOptions(
  */
 export function withSurvey(filters: Filters, surveyId: number | null, surveys: Survey[], columnCount: number): Filters {
   const options = ratingQuestionOptions(surveys, surveyId, columnCount)
+  const inScope = surveyId === null ? surveys : surveys.filter((s) => s.id === surveyId)
+  const keepRating = options.length > 0 && filters.rating !== null && ratingScores(inScope).includes(filters.rating)
   return refine(filters, {
     survey: surveyId,
-    rating: options.length > 0 ? filters.rating : null,
+    rating: keepRating ? filters.rating : null,
     ratingQuestion: filters.ratingQuestion === null || options.length === 0 ? null : options[0].value,
   })
 }
