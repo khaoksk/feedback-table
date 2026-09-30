@@ -187,7 +187,7 @@ Response time is reported rather than gated, because it depends on the machine a
 
 ## 11. Open questions (decided in the PR where they arise)
 
-- `seed_bulk --clear` scope: everything, or only generated data (proposed: everything, with its own surveys)
+- ~~`seed_bulk --clear` scope~~ Decided in Issue #1: clears everything and creates its own surveys, so the same `--seed` reproduces identical data (ids included)
 - Column position after a question is archived: raw `order` or renumbered (Req 5)
 - A conditional question whose source question is archived (Req 6)
 - Which question types the rating filter offers once multi-select and comment exist (Req 2, 3)
