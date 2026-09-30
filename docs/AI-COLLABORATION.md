@@ -75,7 +75,7 @@ must be shown to fail, commands must print their results, and nothing merges wit
    `"5"` at that position. A comment reading "5" would have shown up under "rating 5". A Req 2 test passed only
    by coincidence, because multi-select answers are stored as JSON lists and can't equal `"5"`. A new Req 3 test
    with a comment of `"5"` exposed it. The fix is its own commit
-   ([9cd2a2b](https://github.com/khaoksk/v1-self/commit/9cd2a2b)) so it's visible in the history.
+   ([9cd2a2b](https://github.com/khaoksk/feedback-table/commit/9cd2a2b)) so it's visible in the history.
 2. **A wrong diagnosis of slowness (Issue #1).** At 100K responses one filter took about 390 ms. From
    `EXPLAIN ANALYZE` the agent concluded an index was missing, proposed one, and I approved it. The re-measurement
    looked like a big win, but that run had also refreshed planner statistics, so two things had changed at once.
