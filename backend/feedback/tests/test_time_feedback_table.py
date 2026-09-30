@@ -20,7 +20,7 @@ def test_prints_a_row_per_scenario():
     assert "120 responses" in lines[0]
     # Every scenario hits the endpoint's fixed query budget, not 0 or a stale count.
     query_counts = {line.split("|")[4].strip() for line in table}
-    assert query_counts == {"5"}
+    assert query_counts == {"6"}
 
 
 def test_refuses_to_run_on_an_empty_database():

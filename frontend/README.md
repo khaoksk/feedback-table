@@ -35,7 +35,9 @@ src/
     scales.ts              rating chips and badge colours from each survey's scale
     FeedbackTablePage.tsx  data loading, debounced search, wiring
     LabelEditor.tsx        rename a survey's rating labels (PUT /api/surveys/<id>/rating-labels/)
+    QuestionForm.tsx       add a rating or multi-select question (POST /api/surveys/<id>/questions/)
     Toolbar.tsx, FeedbackTable.tsx, AnswerCell.tsx, Pagination.tsx
+  features/respond/        "Answer a survey" page at /respond (POST /api/surveys/<id>/responses/)
   test/                    Vitest setup and the MSW mock API
 ```
 

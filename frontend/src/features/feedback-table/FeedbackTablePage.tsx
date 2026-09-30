@@ -7,6 +7,7 @@ import { FeedbackTable } from './FeedbackTable'
 import { ratingQuestionOptions, refine, toApiParams, withSurvey } from './filters'
 import { LabelEditor } from './LabelEditor'
 import { Pagination } from './Pagination'
+import { QuestionForm } from './QuestionForm'
 import { ratingScores } from './scales'
 import { Toolbar } from './Toolbar'
 import { useUrlFilters } from './useUrlFilters'
@@ -29,7 +30,8 @@ export function FeedbackTablePage() {
   const columns = selectedSurvey ? columnCount([selectedSurvey]) : allColumns
   const ratingOptions = ratingQuestionOptions(surveys, filters.survey, allColumns)
   const scores = ratingScores(selectedSurvey ? [selectedSurvey] : surveys)
-  const [editingLabels, setEditingLabels] = useState(false)
+  // At most one settings panel is open at a time.
+  const [panel, setPanel] = useState<'labels' | 'question' | null>(null)
 
   const apiParams = toApiParams(filters)
   const tableQuery = useQuery({
@@ -69,7 +71,8 @@ export function FeedbackTablePage() {
         searchText={searchDraft ?? filters.search}
         ratingOptions={ratingOptions}
         ratingScores={scores}
-        onEditLabels={() => setEditingLabels(true)}
+        onEditLabels={() => setPanel('labels')}
+        onAddQuestion={() => setPanel('question')}
         onSearchText={setSearchDraft}
         onSurvey={(surveyId) => setFilters(withSurvey(filters, surveyId, surveys, allColumns))}
         onRating={(rating) =>
@@ -82,8 +85,11 @@ export function FeedbackTablePage() {
         onTicketless={(ticketless) => setFilters(refine(filters, { ticketless }))}
       />
 
-      {editingLabels && selectedSurvey && (
-        <LabelEditor key={selectedSurvey.id} survey={selectedSurvey} onClose={() => setEditingLabels(false)} />
+      {panel === 'labels' && selectedSurvey && (
+        <LabelEditor key={selectedSurvey.id} survey={selectedSurvey} onClose={() => setPanel(null)} />
+      )}
+      {panel === 'question' && selectedSurvey && (
+        <QuestionForm key={selectedSurvey.id} survey={selectedSurvey} onClose={() => setPanel(null)} />
       )}
 
       <p className="count" aria-live="polite">

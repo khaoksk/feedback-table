@@ -33,7 +33,9 @@ Then extend it through the six backlog requirements, in order, one PR each, back
 
 - One row per response; columns: Created, Customer, Company, Ticket, Survey, Q1…Qn
 - Search (customer / company), survey filter, rating filter, "Ticket-less only", sort by Created
-- UI to create questions (Req 2) and a respondent UI to submit and re-submit answers (Req 2, 3, 4, 6)
+- UI to create questions (Req 2) and a respondent UI to submit and re-submit answers (Req 2, 3, 4, 6).
+  The respondent UI is an "Answer a survey" page in the same app: pick a survey, give a name and email
+  (a customer is found by email or created), answer the questions, submit.
 
 ### Added by this PRD
 
@@ -140,7 +142,7 @@ the same validator explicitly.
 | Baseline | `Answer`: unique `(response, question)`, `created_at`, `updated_at` | Blocks duplicate answers before bulk data is generated. The seed has 0 duplicates; the migration fails with a clear message if any exist. Existing rows are backfilled from `Response.submitted_at`. |
 | Baseline | Indexes on `Response (submitted_at, id)` and `(status, submitted_at, id)` | Page through newest first without a sort step, with or without the status filter. A `status`-only index would go unused: two values, ~78% `completed`. |
 | Req 1 | `Survey.rating_labels`: nullable JSON `{score: label}`; `null` means the default Terrible…Great set. **The keys define the scale** (consecutive whole numbers), so a survey can also use e.g. 0–10. | An answer stores the score, and the score is the key, so renaming a label shows the new wording with no migration (Req 5). Out-of-scale scores fall into the existing `legacy` rule. Labels load with the survey (0 extra queries) and are edited as one set. Integrity is validated in `Survey.clean()` and the API serializer, since a `RatingLabel` table would only add database constraints for ~5 rows always edited together. |
-| Req 2 | `Option` table (id, question, label, order, `archived_at`); multi-select answers store option **ids** | Not JSON strings as in the design reference: renaming "Docs" to "Documentation" would orphan old answers and show a live option as removed. Ids keep answers pointing at the option, the table shows its current label, and archived ids render as the design's dashed "removed" chip (Req 5). |
+| Req 2 | `Option` table (id, question, label, order, `archived_at`); multi-select answers store option **ids** as a JSON list in `Answer.value` | Not JSON strings as in the design reference: renaming "Docs" to "Documentation" would orphan old answers and show a live option as removed. Ids keep answers pointing at the option, the table shows its current label, and archived ids render as the design's dashed "removed" chip (Req 5). |
 | Req 4 | `AnswerRevision` (previous value + timestamp); `Answer` keeps the current value | Table reads one row per question (fast); full history; the design needs the original value and date. Revision and update are written in one transaction. |
 | Req 5 | `Question.archived_at` (soft delete) instead of cascading deletes | Answers are never lost. Archived questions are hidden from columns and forms. |
 | Req 6 | Display condition on `Question` (source question, operator, threshold) | Validated: the source comes earlier, is a rating question, and there are no cycles |
@@ -172,7 +174,7 @@ couple two concepts that change for different reasons.
 | Frontend tests | Vitest + React Testing Library + MSW |
 | E2E | One Playwright smoke test (open table → filter → change page), if time allows |
 | CI | GitHub Actions with a Postgres service, on every PR |
-| Performance gate (CI) | `assertNumQueries`: a page of 50 rows uses the same number of queries as a page of 5 |
+| Performance gate (CI) | `assertNumQueries`: a page of 50 rows uses the same number of queries as a page of 5 (5 queries; 6 from Req 2, which prefetches question options) |
 | Performance report (per PR) | Script timing page 1 and the last page: target < 300 ms at 10K; 100K reported only |
 | Lint | flake8 (existing `.flake8`); TypeScript `strict` + ESLint |
 
@@ -197,11 +199,11 @@ Response time is reported rather than gated, because it depends on the machine a
 - ~~`seed_bulk --clear` scope~~ Decided in Issue #1: clears everything and creates its own surveys, so the same `--seed` reproduces identical data (ids included)
 - ~~Rating label storage and whether a survey can change its scale~~ Decided before Req 1: JSON on `Survey`, keys define the scale (§7)
 - ~~Multi-select option storage~~ Decided before Req 1, so Req 1 does not paint Req 2 into a corner: `Option` table, answers store ids (§7)
-- How multi-select option ids are stored in `Answer.value` (e.g. a JSON list of ids) and filtered on (Req 2)
+- ~~How multi-select answers are stored~~ Decided in Req 2: `Answer.value` holds a sorted JSON list of option ids, e.g. `[3, 7]`. It fits the existing text column and the unique `(response, question)` constraint; one row per selected option would break that constraint. The table does not filter on multi-select answers yet.
 - Rating chips when surveys use different scales: the chips offer the scores of the selected survey, or all scores seen across surveys (Req 1)
 - Column position after a question is archived: raw `order` or renumbered (Req 5)
 - A conditional question whose source question is archived (Req 6)
-- Which question types the rating filter offers once multi-select and comment exist (Req 2, 3)
+- ~~Which question types the rating filter offers~~ Decided in Req 2: rating questions only. Across all surveys it filters by position, and a survey whose question at that position is not a rating simply has no matches.
 
 ## 12. Future work
 

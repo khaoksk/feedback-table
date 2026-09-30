@@ -17,11 +17,12 @@ from django.db import connection, transaction
 from django.db.models import OuterRef, Subquery
 from django.utils import timezone
 
-from feedback.models import Answer, Customer, Question, Response, Survey, Ticket
+from feedback.models import Answer, Customer, Option, Question, Response, Survey, Ticket
 from feedback.scales import normalize_rating_labels
-from feedback.validators import validate_rating
+from feedback.validators import serialize_selection, validate_rating, validate_selection
 
-# (name, question texts, rating labels or None for the defaults)
+# (name, questions, rating labels or None for the defaults). A question is
+# either rating text, or (text, [options]) for a multi-select question.
 SURVEYS = [
     (
         "Post-Support CSAT",
@@ -38,6 +39,11 @@ SURVEYS = [
         [
             "How easy was it to get started?",
             "How would you rate your first week with us?",
+            # The design reference's Req 2 example.
+            (
+                "What made the biggest difference?",
+                ["Docs", "Support team", "Pricing", "Kickoff call", "Product itself"],
+            ),
         ],
         {1: "Meh", 2: "Rough", 3: "Fine", 4: "Nice", 5: "Awesome"},
     ),
@@ -77,6 +83,8 @@ TICKET_SUBJECTS = [
 
 # Weighted towards positive scores, as CSAT data usually is.
 RATING_WEIGHTS = {1: 5, 2: 8, 3: 15, 4: 35, 5: 37}
+# How many options a multi-select answer picks.
+SELECTION_SIZE_WEIGHTS = {1: 45, 2: 35, 3: 20}
 
 NO_TICKET_RATE = 0.20
 DRAFT_RATE = 0.20
@@ -182,7 +190,8 @@ class Generator:
                     for answer in self._answers(response, surveys[response.survey_id], stats)
                 ]
             )
-            answer_ids.extend(answer.id for answer in answers)
+            # Legacy scores only make sense on rating answers.
+            answer_ids.extend(answer.id for answer in answers if answer.question.type == Question.RATING)
             stats["responses"] += len(responses)
             stats["answers"] += len(answers)
 
@@ -218,17 +227,26 @@ class Generator:
 
     def _surveys(self):
         surveys = {}
-        for name, texts, labels in SURVEYS:
+        for name, specs, labels in SURVEYS:
             survey = Survey.objects.create(
                 name=name,
                 rating_labels=None if labels is None else normalize_rating_labels(labels),
             )
-            survey.question_list = Question.objects.bulk_create(
-                [
-                    Question(survey=survey, text=text, type=Question.RATING, order=order)
-                    for order, text in enumerate(texts, start=1)
+            survey.question_list = []
+            for order, spec in enumerate(specs, start=1):
+                text, options = (spec, None) if isinstance(spec, str) else spec
+                question = Question.objects.create(
+                    survey=survey, text=text, order=order,
+                    type=Question.RATING if options is None else Question.MULTISELECT,
+                )
+                question.option_ids = [
+                    option.id
+                    for option in Option.objects.bulk_create(
+                        Option(question=question, label=label, order=position)
+                        for position, label in enumerate(options or [], start=1)
+                    )
                 ]
-            )
+                survey.question_list.append(question)
             surveys[survey.id] = survey
         return surveys
 
@@ -254,8 +272,13 @@ class Generator:
             if question.order > 1 and self.rng.random() < SKIP_LATER_QUESTION_RATE:
                 stats["skipped"] += 1
                 continue
-            value = str(self.rng.choices(list(RATING_WEIGHTS), weights=RATING_WEIGHTS.values())[0])
-            validate_rating(value)
+            if question.type == Question.MULTISELECT:
+                size = self.rng.choices(list(SELECTION_SIZE_WEIGHTS), weights=SELECTION_SIZE_WEIGHTS.values())[0]
+                ids = validate_selection(self.rng.sample(question.option_ids, size), question.option_ids)
+                value = serialize_selection(ids)
+            else:
+                value = str(self.rng.choices(list(RATING_WEIGHTS), weights=RATING_WEIGHTS.values())[0])
+                validate_rating(value)
             answers.append(Answer(response=response, question=question, value=value))
         return answers
 

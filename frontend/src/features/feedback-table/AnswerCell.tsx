@@ -1,4 +1,4 @@
-import type { AnswerCell as AnswerCellData, Question } from '../../api/types'
+import type { AnswerCell as AnswerCellData, Question, Selection } from '../../api/types'
 import { toneFor } from './scales'
 
 interface Props {
@@ -33,6 +33,9 @@ export function AnswerCell({ question, answer, scale, showQuestionText }: Props)
 }
 
 function AnswerValue({ answer, scale }: { answer: AnswerCellData; scale: number[] }) {
+  // Multi-select answers arrive as selections, whether or not one was removed.
+  if (answer.selections) return <Chips selections={answer.selections} />
+
   switch (answer.state) {
     case 'ok':
       return (
@@ -54,5 +57,24 @@ function AnswerValue({ answer, scale }: { answer: AnswerCellData; scale: number[
       )
     case 'unanswered':
       return <span className="qcell-blank">blank — not answered</span>
+    case 'removed_option':
+      // Only multi-select answers can reference a removed option (handled above).
+      return <span className="qcell-blank">{answer.display}</span>
   }
+}
+
+function Chips({ selections }: { selections: Selection[] }) {
+  return (
+    <span className="chips">
+      {selections.map((selection) => (
+        <span
+          key={selection.id}
+          className={`chip${selection.removed ? ' removed' : ''}`}
+          title={selection.removed ? 'Option removed from current survey settings' : undefined}
+        >
+          {selection.label}
+        </span>
+      ))}
+    </span>
+  )
 }

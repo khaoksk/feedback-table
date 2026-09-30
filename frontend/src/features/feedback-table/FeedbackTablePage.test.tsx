@@ -4,7 +4,17 @@ import userEvent from '@testing-library/user-event'
 import { HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
-import { handlers, labelUpdates, lastTableParams, page, row, server, SURVEYS, tableRequests } from '../../test/server'
+import {
+  createdQuestions,
+  handlers,
+  labelUpdates,
+  lastTableParams,
+  page,
+  row,
+  server,
+  SURVEYS,
+  tableRequests,
+} from '../../test/server'
 import { FeedbackTablePage } from './FeedbackTablePage'
 
 function renderPage(url = '/') {
@@ -346,6 +356,108 @@ describe('FeedbackTablePage', () => {
 
       expect(screen.queryByRole('form')).not.toBeInTheDocument()
       expect(labelUpdates).toEqual([])
+    })
+  })
+
+  describe('multi-select questions (Req 2)', () => {
+    it('shows a multi-select answer as chips in its column', async () => {
+      server.use(
+        handlers.table(() =>
+          page([
+            row({
+              survey_id: 3,
+              answers: {
+                '31': { value: '4', display: 'Good', state: 'ok' },
+                '32': {
+                  value: '[301, 303]',
+                  display: 'Docs, Kickoff call',
+                  state: 'ok',
+                  selections: [
+                    { id: 301, label: 'Docs', removed: false },
+                    { id: 303, label: 'Kickoff call', removed: false },
+                  ],
+                },
+              },
+            }),
+          ]),
+        ),
+      )
+      renderPage()
+      const [first] = await waitForRows()
+
+      const q2 = within(first).getAllByRole('cell')[6]
+      expect(within(q2).getByText('Docs')).toHaveClass('chip')
+      expect(within(q2).getByText('Kickoff call')).toHaveClass('chip')
+    })
+
+    async function openQuestionForm() {
+      const result = renderPage('/?survey=1')
+      await waitForRows()
+      await result.user.click(screen.getByRole('button', { name: 'Add question' }))
+      return { ...result, form: screen.getByRole('form', { name: 'Add a question to Post-Support CSAT' }) }
+    }
+
+    it('creates a multi-select question with the options entered', async () => {
+      const { user, form } = await openQuestionForm()
+
+      await user.type(within(form).getByLabelText('Question'), 'What made the biggest difference?')
+      await user.type(within(form).getByLabelText('Option 1'), 'Docs')
+      await user.type(within(form).getByLabelText('Option 2'), 'Pricing')
+      await user.click(within(form).getByRole('button', { name: '+ Add option' }))
+      await user.type(within(form).getByLabelText('Option 3'), 'Kickoff call')
+      await user.click(within(form).getByRole('button', { name: 'Add question' }))
+
+      await waitFor(() => expect(screen.queryByRole('form')).not.toBeInTheDocument())
+      expect(createdQuestions).toEqual([
+        {
+          surveyId: 1,
+          body: {
+            text: 'What made the biggest difference?',
+            type: 'multiselect',
+            options: ['Docs', 'Pricing', 'Kickoff call'],
+          },
+        },
+      ])
+    })
+
+    it('can remove an option but keeps at least two', async () => {
+      const { user, form } = await openQuestionForm()
+      expect(within(form).queryByRole('button', { name: /Remove option/ })).not.toBeInTheDocument()
+
+      await user.click(within(form).getByRole('button', { name: '+ Add option' }))
+      await user.click(within(form).getByRole('button', { name: 'Remove option 1' }))
+
+      expect(within(form).getAllByLabelText(/^Option \d$/)).toHaveLength(2)
+      expect(within(form).queryByRole('button', { name: /Remove option/ })).not.toBeInTheDocument()
+    })
+
+    it('creates a rating question without options', async () => {
+      const { user, form } = await openQuestionForm()
+
+      await user.type(within(form).getByLabelText('Question'), 'How did we do?')
+      await user.click(within(form).getByLabelText(/^Rating/))
+      expect(within(form).queryByLabelText('Option 1')).not.toBeInTheDocument()
+      await user.click(within(form).getByRole('button', { name: 'Add question' }))
+
+      await waitFor(() =>
+        expect(createdQuestions).toEqual([
+          { surveyId: 1, body: { text: 'How did we do?', type: 'rating', options: [] } },
+        ]),
+      )
+    })
+
+    it('shows validation errors from the API', async () => {
+      server.use(
+        handlers.createQuestion(() =>
+          HttpResponse.json({ options: ['Each option needs a different label.'] }, { status: 400 }),
+        ),
+      )
+      const { user, form } = await openQuestionForm()
+
+      await user.type(within(form).getByLabelText('Question'), 'Q')
+      await user.click(within(form).getByRole('button', { name: 'Add question' }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Each option needs a different label.')
     })
   })
 })

@@ -8,6 +8,7 @@ from feedback.models import Answer, Response
 from .factories import (
     DEFAULT_SCALE,
     CustomerFactory,
+    OptionFactory,
     QuestionFactory,
     ResponseFactory,
     SurveyFactory,
@@ -118,8 +119,8 @@ def test_surveys_on_the_page_are_described_with_ordered_questions(client, csat):
             "rating_scale": DEFAULT_SCALE,
             "custom_labels": False,
             "questions": [
-                {"id": q1.id, "order": 1, "text": "How satisfied?", "type": "rating"},
-                {"id": q2.id, "order": 2, "text": "How fast?", "type": "rating"},
+                {"id": q1.id, "order": 1, "text": "How satisfied?", "type": "rating", "options": []},
+                {"id": q2.id, "order": 2, "text": "How fast?", "type": "rating", "options": []},
             ],
         }
     }
@@ -248,11 +249,49 @@ def test_query_count_does_not_grow_with_rows(client, csat, django_assert_num_que
         respond(survey, {q1: "4", q2: "5"}, minutes=minute, ticket=TicketFactory())
         respond(other, {other_q: "2"}, minutes=minute, ticket=None)
 
-    # count, rows (+customer, ticket), answers, surveys, questions
-    with django_assert_num_queries(5):
+    # count, rows (+customer, ticket), answers, surveys, questions, options
+    with django_assert_num_queries(6):
         small = get(client, page_size=5)
-    with django_assert_num_queries(5):
+    with django_assert_num_queries(6):
         large = get(client, page_size=60)
 
     assert len(small["results"]) == 5
     assert len(large["results"]) == 60
+
+
+# --- Multi-select (Req 2) ---------------------------------------------------
+
+
+def test_multiselect_answers_come_back_as_labelled_selections(client):
+    survey = SurveyFactory()
+    question = QuestionFactory(survey=survey, order=1, type="multiselect", text="What helped?")
+    docs = OptionFactory(question=question, label="Docs", order=1)
+    kickoff = OptionFactory(question=question, label="Kickoff call", order=2)
+    OptionFactory(question=question, label="Old option", order=3, archived_at=BASE_TIME)
+    respond(survey, {question: f"[{kickoff.id}, {docs.id}]"})
+
+    data = get(client)
+
+    assert data["results"][0]["answers"][str(question.id)] == {
+        "value": f"[{kickoff.id}, {docs.id}]",
+        "display": "Docs, Kickoff call",
+        "state": "ok",
+        "selections": [
+            {"id": docs.id, "label": "Docs", "removed": False},
+            {"id": kickoff.id, "label": "Kickoff call", "removed": False},
+        ],
+    }
+    # Only options a respondent can still pick are described.
+    assert data["surveys"][str(survey.id)]["questions"][0]["options"] == [
+        {"id": docs.id, "label": "Docs", "order": 1},
+        {"id": kickoff.id, "label": "Kickoff call", "order": 2},
+    ]
+
+
+def test_rating_filter_ignores_multiselect_answers(client):
+    survey = SurveyFactory()
+    question = QuestionFactory(survey=survey, order=1, type="multiselect")
+    option = OptionFactory(question=question)
+    respond(survey, {question: f"[{option.id}]"})
+
+    assert get(client, rating=option.id, rating_question=1)["count"] == 0
