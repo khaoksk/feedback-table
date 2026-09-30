@@ -1,6 +1,6 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import Exists, Max, OuterRef, Prefetch, Q
+from django.db.models import Count, Exists, Max, OuterRef, Prefetch, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, render
 from rest_framework import status
@@ -207,6 +207,32 @@ class SurveyResponsesView(APIView):
 
         response = create_response(survey, data["email"], data["name"], data["company"], cleaned)
         return ApiResponse({"id": response.id, "edit_token": response.edit_token}, status=status.HTTP_201_CREATED)
+
+
+class SurveyArchivedQuestionsView(APIView):
+    """GET a survey's archived questions, newest first, with how many answers each keeps.
+
+    Archived questions have no column and no form field (Req 5); this is the
+    one place the UI can show that they, and their answers, still exist.
+    """
+
+    def get(self, request, survey_id):
+        survey = get_object_or_404(Survey, pk=survey_id)
+        questions = (
+            Question.objects.filter(survey=survey, archived_at__isnull=False)
+            .annotate(answer_count=Count("answers"))
+            .order_by("-archived_at", "-id")
+        )
+        return ApiResponse([
+            {
+                "id": question.id,
+                "text": question.text,
+                "type": question.type,
+                "archived_at": question.archived_at,
+                "answer_count": question.answer_count,
+            }
+            for question in questions
+        ])
 
 
 class QuestionView(APIView):

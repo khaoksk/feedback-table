@@ -266,3 +266,40 @@ def test_widening_the_scale_to_zero_to_ten_keeps_old_scores_valid(client):
 
     assert row(client, survey)["answers"][str(question.id)]["display"] == "5/10"
     assert Response.objects.count() == 1
+
+
+# --- Listing archived questions --------------------------------------------------------
+
+
+def test_archived_questions_are_listed_with_the_answers_they_keep(client, three_questions, django_assert_num_queries):
+    survey, q1, q2, q3 = three_questions
+    archive(client, q2)
+
+    with django_assert_num_queries(2):  # survey, questions with answer counts
+        body = client.get(f"/api/surveys/{survey.id}/archived-questions/").json()
+
+    assert len(body) == 1
+    assert {k: body[0][k] for k in ("id", "text", "type", "answer_count")} == {
+        "id": q2.id, "text": "Friendliness", "type": "rating", "answer_count": 1,
+    }
+    assert body[0]["archived_at"]
+
+
+def test_archived_questions_are_newest_first_and_only_this_surveys(client, three_questions):
+    survey, q1, q2, q3 = three_questions
+    other = QuestionFactory(text="Other survey")
+    QuestionFactory(survey=other.survey, order=2)
+    archive(client, q2)
+    archive(client, q3)
+    archive(client, other)
+
+    body = client.get(f"/api/surveys/{survey.id}/archived-questions/").json()
+
+    assert [q["text"] for q in body] == ["Speed", "Friendliness"]
+
+
+def test_no_archived_questions_is_an_empty_list(client):
+    survey = SurveyFactory()
+
+    assert client.get(f"/api/surveys/{survey.id}/archived-questions/").json() == []
+    assert client.get("/api/surveys/999999/archived-questions/").status_code == 404
