@@ -7,7 +7,8 @@ from django.core.management.base import CommandError
 from django.db.models import Count, F
 
 from feedback.management.commands import seed_bulk
-from feedback.models import Answer, Customer, Response, Survey
+from feedback.models import Answer, Customer, Question, Response, Survey
+from feedback.validators import validate_selection
 
 from .factories import ResponseFactory
 
@@ -78,7 +79,8 @@ def test_generated_rows_are_consistent():
     assert not Response.objects.exclude(ticket=None).exclude(ticket__customer=F("customer")).exists()
     assert not Answer.objects.exclude(created_at=F("response__submitted_at")).exists()
     assert not Answer.objects.exclude(updated_at=F("response__submitted_at")).exists()
-    assert set(Answer.objects.values_list("value", flat=True)) <= {"0", "1", "2", "3", "4", "5"}
+    ratings = Answer.objects.filter(question__type=Question.RATING)
+    assert set(ratings.values_list("value", flat=True)) <= {"0", "1", "2", "3", "4", "5"}
 
 
 def test_same_seed_gives_identical_data():
@@ -123,3 +125,26 @@ def test_one_survey_uses_custom_labels():
     custom = Survey.objects.exclude(rating_labels=None)
     assert [survey.name for survey in custom] == ["Onboarding CSAT"]
     assert custom[0].rating_labels["5"] == "Awesome"
+
+
+def test_onboarding_has_a_multiselect_question_with_valid_selections():
+    run(responses=200, clear=True)
+
+    question = Question.objects.get(type=Question.MULTISELECT)
+    assert question.survey.name == "Onboarding CSAT"
+    assert [o.label for o in question.options.all()] == [
+        "Docs", "Support team", "Pricing", "Kickoff call", "Product itself",
+    ]
+    active = set(question.options.values_list("id", flat=True))
+    answers = Answer.objects.filter(question=question)
+    assert answers.exists()
+    for answer in answers:
+        assert 1 <= len(validate_selection(answer.value, active)) <= 3
+
+
+def test_legacy_scores_only_land_on_rating_answers():
+    run(responses=400, seed=7, clear=True)
+
+    legacy = Answer.objects.filter(value=seed_bulk.LEGACY_VALUE)
+    assert legacy.exists()
+    assert not legacy.exclude(question__type=Question.RATING).exists()
