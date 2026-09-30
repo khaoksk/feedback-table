@@ -57,6 +57,35 @@ def responses_page(request):
     return render(request, "feedback/responses.html", {"rows": rows})
 
 
+def surveys_with_questions():
+    return Survey.objects.order_by("id").prefetch_related(
+        Prefetch("questions", queryset=Question.objects.order_by("order", "id"))
+    )
+
+
+def survey_payload(survey):
+    return {
+        "name": survey.name,
+        "questions": [
+            {"id": q.id, "order": q.order, "text": q.text, "type": q.type}
+            for q in survey.questions.all()
+        ],
+    }
+
+
+class SurveyListView(APIView):
+    """Every survey with its questions, for filters and the table's columns.
+
+    The feedback table only describes the surveys on the current page; the UI
+    needs all of them to keep columns stable across pages.
+    """
+
+    def get(self, request):
+        return ApiResponse(
+            [{"id": survey.id, **survey_payload(survey)} for survey in surveys_with_questions()]
+        )
+
+
 class FeedbackTablePagination(PageNumberPagination):
     page_size = 50
     page_size_query_param = "page_size"
@@ -83,14 +112,7 @@ class FeedbackTableView(GenericAPIView):
             [self._row(response, surveys[response.survey_id]) for response in page]
         )
         response.data["surveys"] = {
-            str(survey.id): {
-                "name": survey.name,
-                "questions": [
-                    {"id": q.id, "order": q.order, "text": q.text, "type": q.type}
-                    for q in survey.questions.all()
-                ],
-            }
-            for survey in surveys.values()
+            str(survey.id): survey_payload(survey) for survey in surveys.values()
         }
         return response
 
@@ -129,12 +151,7 @@ class FeedbackTableView(GenericAPIView):
         return queryset.order_by(f"{direction}submitted_at", f"{direction}id")
 
     def _surveys(self, survey_ids):
-        return {
-            survey.id: survey
-            for survey in Survey.objects.filter(id__in=survey_ids).prefetch_related(
-                Prefetch("questions", queryset=Question.objects.order_by("order", "id"))
-            )
-        }
+        return {survey.id: survey for survey in surveys_with_questions().filter(id__in=survey_ids)}
 
     def _row(self, response, survey):
         values = {answer.question_id: answer.value for answer in response.answers.all()}
