@@ -7,27 +7,49 @@ frontend styles on (see docs/PRD.md §6).
 """
 from .models import Question
 from .scales import DEFAULT_RATING_LABELS
+from .validators import parse_selection
 
 LEGACY_RATING_LABEL = "Unrated"
+UNKNOWN_OPTION_LABEL = "Unknown option"
 
 OK = "ok"
 LEGACY = "legacy"
 INVALID = "invalid"
 UNANSWERED = "unanswered"
+REMOVED_OPTION = "removed_option"
 
 
-def resolve_answer(question, value, rating_labels=DEFAULT_RATING_LABELS):
+def resolve_answer(question, value, rating_labels=DEFAULT_RATING_LABELS, options=None):
     """Resolve one question's answer; `value` is None when it was not answered.
 
     `rating_labels` is the survey's current {score: label} map
-    (scales.rating_labels), so renamed labels and changed scales show up
-    immediately for every existing answer.
+    (scales.rating_labels) and `options` the question's {id: Option} map,
+    archived ones included, so renamed labels, changed scales and removed
+    options show up immediately for every existing answer.
     """
     if value is None:
         return _cell(None, None, UNANSWERED)
     if question.type == Question.RATING:
         return _resolve_rating(value, rating_labels)
+    if question.type == Question.MULTISELECT:
+        return _resolve_selection(value, options or {})
     return _cell(value, value, OK)
+
+
+def _resolve_selection(value, options):
+    ids = parse_selection(value)
+    if ids is None:
+        return _cell(value, None, INVALID)
+    # Show choices in the question's option order; ids that no longer exist go last.
+    known = sorted((options[i] for i in ids if i in options), key=lambda o: (o.order, o.id))
+    selections = [
+        {"id": option.id, "label": option.label, "removed": option.archived_at is not None}
+        for option in known
+    ] + [{"id": i, "label": UNKNOWN_OPTION_LABEL, "removed": True} for i in ids if i not in options]
+    state = REMOVED_OPTION if any(s["removed"] for s in selections) else OK
+    cell = _cell(value, ", ".join(s["label"] for s in selections), state)
+    cell["selections"] = selections
+    return cell
 
 
 def _resolve_rating(value, labels):

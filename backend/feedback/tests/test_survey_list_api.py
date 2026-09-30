@@ -14,7 +14,7 @@ def test_lists_every_survey_with_ordered_questions(django_assert_num_queries):
     for order in range(1, 4):
         QuestionFactory(survey=second, order=order)
 
-    with django_assert_num_queries(2):  # surveys, questions
+    with django_assert_num_queries(3):  # surveys, questions, options
         data = APIClient().get("/api/surveys/").json()
 
     assert [survey["name"] for survey in data] == ["CSAT", "Onboarding"]
@@ -24,8 +24,8 @@ def test_lists_every_survey_with_ordered_questions(django_assert_num_queries):
         "rating_scale": DEFAULT_SCALE,
         "custom_labels": False,
         "questions": [
-            {"id": q1.id, "order": 1, "text": "How satisfied?", "type": "rating"},
-            {"id": q2.id, "order": 2, "text": "How fast?", "type": "rating"},
+            {"id": q1.id, "order": 1, "text": "How satisfied?", "type": "rating", "options": []},
+            {"id": q2.id, "order": 2, "text": "How fast?", "type": "rating", "options": []},
         ],
     }
     assert [q["order"] for q in data[1]["questions"]] == [1, 2, 3]

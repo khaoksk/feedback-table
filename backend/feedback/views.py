@@ -59,9 +59,26 @@ def responses_page(request):
 
 
 def surveys_with_questions():
+    # Options include archived ones: old answers still point at them.
     return Survey.objects.order_by("id").prefetch_related(
-        Prefetch("questions", queryset=Question.objects.order_by("order", "id"))
+        Prefetch("questions", queryset=Question.objects.order_by("order", "id")),
+        "questions__options",
     )
+
+
+def question_payload(question):
+    return {
+        "id": question.id,
+        "order": question.order,
+        "text": question.text,
+        "type": question.type,
+        # Only choices a respondent can still pick; archived ones stay out.
+        "options": [
+            {"id": option.id, "label": option.label, "order": option.order}
+            for option in question.options.all()
+            if option.archived_at is None
+        ],
+    }
 
 
 def survey_payload(survey):
@@ -73,10 +90,7 @@ def survey_payload(survey):
             {"score": score, "label": label} for score, label in rating_labels(survey).items()
         ],
         "custom_labels": survey.rating_labels is not None,
-        "questions": [
-            {"id": q.id, "order": q.order, "text": q.text, "type": q.type}
-            for q in survey.questions.all()
-        ],
+        "questions": [question_payload(question) for question in survey.questions.all()],
     }
 
 
@@ -127,8 +141,8 @@ class FeedbackTablePagination(PageNumberPagination):
 class FeedbackTableView(GenericAPIView):
     """One row per response, with answers keyed by question id.
 
-    Query count is fixed per page (count, rows, answers, surveys, questions),
-    whatever the page size or total number of responses.
+    Query count is fixed per page (count, rows, answers, surveys, questions,
+    options), whatever the page size or total number of responses.
     """
 
     pagination_class = FeedbackTablePagination
@@ -140,10 +154,15 @@ class FeedbackTableView(GenericAPIView):
         page = self.paginate_queryset(self._responses(params.validated_data))
         surveys = self._surveys({response.survey_id for response in page})
         labels = {survey_id: rating_labels(survey) for survey_id, survey in surveys.items()}
+        options = {
+            question.id: {option.id: option for option in question.options.all()}
+            for survey in surveys.values()
+            for question in survey.questions.all()
+        }
 
         response = self.get_paginated_response(
             [
-                self._row(response, surveys[response.survey_id], labels[response.survey_id])
+                self._row(response, surveys[response.survey_id], labels[response.survey_id], options)
                 for response in page
             ]
         )
@@ -189,7 +208,7 @@ class FeedbackTableView(GenericAPIView):
     def _surveys(self, survey_ids):
         return {survey.id: survey for survey in surveys_with_questions().filter(id__in=survey_ids)}
 
-    def _row(self, response, survey, labels):
+    def _row(self, response, survey, labels, options):
         values = {answer.question_id: answer.value for answer in response.answers.all()}
         return {
             "id": response.id,
@@ -207,7 +226,9 @@ class FeedbackTableView(GenericAPIView):
             ),
             "survey_id": response.survey_id,
             "answers": {
-                str(question.id): resolve_answer(question, values.get(question.id), labels)
+                str(question.id): resolve_answer(
+                    question, values.get(question.id), labels, options[question.id]
+                )
                 for question in survey.questions.all()
             },
         }
