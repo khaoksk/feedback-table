@@ -111,6 +111,7 @@ class Command(BaseCommand):
                 rng=random.Random(options["seed"]),
                 anchor=timezone.now().replace(hour=0, minute=0, second=0, microsecond=0),
             ).run(options["responses"], options["batch_size"])
+        self._analyze()
 
         self.stdout.write(
             self.style.SUCCESS(
@@ -121,6 +122,14 @@ class Command(BaseCommand):
                 f"{stats['skipped']} skipped answers, {stats['legacy']} legacy scores)."
             )
         )
+
+    def _analyze(self):
+        # A bulk load leaves planner statistics stale until autovacuum gets to
+        # them; timing right after seeding then measures bad plans (a rating
+        # filter at 100K took ~390 ms before ANALYZE and ~75 ms after).
+        tables = [model._meta.db_table for model in (Answer, Response, Question, Ticket, Survey, Customer)]
+        with connection.cursor() as cursor:
+            cursor.execute(f"ANALYZE {', '.join(tables)}")
 
     def _truncate(self):
         tables = [
