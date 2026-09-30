@@ -73,6 +73,34 @@ export interface ResponseSubmission {
   answers: Record<string, number | number[] | string>
 }
 
-export function submitResponse(surveyId: number, submission: ResponseSubmission): Promise<{ id: number }> {
-  return sendJson<{ id: number }>('POST', `/api/surveys/${surveyId}/responses/`, submission)
+/** The new response's id, and the secret for the respondent's private edit link. */
+export function submitResponse(
+  surveyId: number,
+  submission: ResponseSubmission,
+): Promise<{ id: number; edit_token: string }> {
+  return sendJson<{ id: number; edit_token: string }>('POST', `/api/surveys/${surveyId}/responses/`, submission)
+}
+
+export interface EditableResponse {
+  id: number
+  survey_id: number
+  customer: { name: string; email: string; company: string }
+  answers: ResponseSubmission['answers']
+}
+
+function editPath(responseId: number, token: string): string {
+  return `/api/responses/${responseId}/edit/?token=${encodeURIComponent(token)}`
+}
+
+export function fetchResponseForEdit(responseId: number, token: string, signal?: AbortSignal): Promise<EditableResponse> {
+  return request<EditableResponse>(new URL(editPath(responseId, token), window.location.origin), { signal })
+}
+
+/** Change answers; returns how many changed. Questions left out keep their answer. */
+export function updateResponse(
+  responseId: number,
+  token: string,
+  answers: ResponseSubmission['answers'],
+): Promise<{ id: number; changed: number }> {
+  return sendJson<{ id: number; changed: number }>('PUT', editPath(responseId, token), { answers })
 }

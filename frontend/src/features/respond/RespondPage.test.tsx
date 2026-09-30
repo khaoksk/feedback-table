@@ -71,6 +71,14 @@ describe('RespondPage', () => {
 
     const status = await screen.findByRole('status')
     expect(status).toHaveTextContent('Response #501')
+    // The private edit link carries the token the API returned (Req 4).
+    expect(within(status).getByLabelText(/private link to change your answers/)).toHaveValue(
+      `${window.location.origin}/respond/501?token=tok-123`,
+    )
+    expect(within(status).getByRole('link', { name: 'Change my answers' })).toHaveAttribute(
+      'href',
+      `${window.location.origin}/respond/501?token=tok-123`,
+    )
     expect(within(status).getByRole('link', { name: 'See it in the feedback table' })).toHaveAttribute(
       'href',
       '/?survey=3',

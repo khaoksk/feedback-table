@@ -11,12 +11,23 @@ export interface Selection {
   removed: boolean
 }
 
+/** How a re-answered value started out (Req 4). */
+export interface EditedInfo {
+  original_value: string
+  /** The original, resolved with the survey's current labels and options. */
+  original_display: string | null
+  original_at: string
+  edit_count: number
+}
+
 export interface AnswerCell {
   value: string | null
   display: string | null
   state: AnswerState
   /** Present for multi-select answers only. */
   selections?: Selection[]
+  /** Present when the respondent changed this answer after submitting. */
+  edited?: EditedInfo
 }
 
 export type QuestionType = 'rating' | 'multiselect' | 'comment'

@@ -91,6 +91,18 @@ export const labelUpdates: { surveyId: number; labels: Record<string, string> | 
 /** Bodies of POST .../questions/ and .../responses/ requests seen during a test. */
 export const createdQuestions: { surveyId: number; body: unknown }[] = []
 export const submittedResponses: { surveyId: number; body: unknown }[] = []
+/** PUT /api/responses/<id>/edit/ requests seen during a test. */
+export const responseUpdates: { responseId: number; token: string | null; body: unknown }[] = []
+
+export const EDIT_TOKEN = 'tok-123'
+
+/** A saved response to Onboarding CSAT, as its edit link returns it. */
+export const EDITABLE = {
+  id: 501,
+  survey_id: 3,
+  customer: { name: 'Ada', email: 'ada@example.com', company: 'Acme' },
+  answers: { '31': 2, '32': [301], '33': 'Slow start' } as Record<string, number | number[] | string>,
+}
 
 export const handlers = {
   surveys: (surveys: Survey[] = SURVEYS) => http.get('*/api/surveys/', () => HttpResponse.json(surveys)),
@@ -110,7 +122,20 @@ export const handlers = {
   submitResponse: (respond?: () => Response) =>
     http.post('*/api/surveys/:id/responses/', async ({ params, request }) => {
       submittedResponses.push({ surveyId: Number(params.id), body: await request.json() })
-      return respond ? respond() : HttpResponse.json({ id: 501 }, { status: 201 })
+      return respond ? respond() : HttpResponse.json({ id: 501, edit_token: EDIT_TOKEN }, { status: 201 })
+    }),
+  editResponse: (respond?: (token: string | null) => Response | undefined) =>
+    http.get('*/api/responses/:id/edit/', ({ request }) => {
+      const token = new URL(request.url).searchParams.get('token')
+      const custom = respond?.(token)
+      if (custom) return custom
+      return token === EDIT_TOKEN ? HttpResponse.json(EDITABLE) : new HttpResponse(null, { status: 404 })
+    }),
+  updateResponse: (respond?: () => Response) =>
+    http.put('*/api/responses/:id/edit/', async ({ params, request }) => {
+      const token = new URL(request.url).searchParams.get('token')
+      responseUpdates.push({ responseId: Number(params.id), token, body: await request.json() })
+      return respond ? respond() : HttpResponse.json({ id: Number(params.id), changed: 1 })
     }),
   updateLabels: (respond?: (surveyId: number) => Response) =>
     http.put('*/api/surveys/:id/rating-labels/', async ({ params, request }) => {
@@ -135,6 +160,8 @@ export const server = setupServer(
   handlers.updateLabels(),
   handlers.createQuestion(),
   handlers.submitResponse(),
+  handlers.editResponse(),
+  handlers.updateResponse(),
 )
 
 export function lastTableParams(): URLSearchParams {
@@ -148,4 +175,5 @@ export function resetTableRequests() {
   labelUpdates.length = 0
   createdQuestions.length = 0
   submittedResponses.length = 0
+  responseUpdates.length = 0
 }

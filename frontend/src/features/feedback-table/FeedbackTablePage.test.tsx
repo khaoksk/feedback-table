@@ -480,4 +480,37 @@ describe('FeedbackTablePage', () => {
       )
     })
   })
+
+  describe('edited answers (Req 4)', () => {
+    it('marks a re-answered value in the table', async () => {
+      server.use(
+        handlers.table(() =>
+          page([
+            row({
+              answers: {
+                '11': {
+                  value: '5',
+                  display: 'Great',
+                  state: 'ok',
+                  edited: {
+                    original_value: '2',
+                    original_display: 'Bad',
+                    original_at: '2026-06-20T10:00:00Z',
+                    edit_count: 1,
+                  },
+                },
+                '12': { value: '3', display: 'Okay', state: 'ok' },
+              },
+            }),
+          ]),
+        ),
+      )
+      renderPage()
+      const [first] = await waitForRows()
+
+      const q1 = within(first).getAllByRole('cell')[5]
+      expect(within(q1).getByText('edited')).toHaveAttribute('title', 'Originally 2 · Bad on 2026-06-20 · edited once')
+      expect(within(within(first).getAllByRole('cell')[6]).queryByText('edited')).not.toBeInTheDocument()
+    })
+  })
 })
