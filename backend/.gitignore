@@ -6,3 +6,4 @@ pg_data/
 .venv/
 .DS_Store
 /staticfiles/
+.pytest_cache/
