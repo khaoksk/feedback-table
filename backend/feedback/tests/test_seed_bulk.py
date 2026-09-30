@@ -115,3 +115,11 @@ def test_clear_replaces_existing_data():
 
     assert not Response.objects.filter(customer__email=existing.customer.email).exists()
     assert Response.objects.count() == 10
+
+
+def test_one_survey_uses_custom_labels():
+    run(responses=50, clear=True)
+
+    custom = Survey.objects.exclude(rating_labels=None)
+    assert [survey.name for survey in custom] == ["Onboarding CSAT"]
+    assert custom[0].rating_labels["5"] == "Awesome"

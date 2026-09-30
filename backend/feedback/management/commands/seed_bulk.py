@@ -18,8 +18,10 @@ from django.db.models import OuterRef, Subquery
 from django.utils import timezone
 
 from feedback.models import Answer, Customer, Question, Response, Survey, Ticket
+from feedback.scales import normalize_rating_labels
 from feedback.validators import validate_rating
 
+# (name, question texts, rating labels or None for the defaults)
 SURVEYS = [
     (
         "Post-Support CSAT",
@@ -27,13 +29,17 @@ SURVEYS = [
             "How satisfied were you with the support you received?",
             "How would you rate the speed of our response?",
         ],
+        None,
     ),
+    # Custom labels, as in the design reference's Req 1 example: the same
+    # scores read differently from the other surveys.
     (
         "Onboarding CSAT",
         [
             "How easy was it to get started?",
             "How would you rate your first week with us?",
         ],
+        {1: "Meh", 2: "Rough", 3: "Fine", 4: "Nice", 5: "Awesome"},
     ),
     # One longer survey, so the table has a Q3 column that the others leave empty.
     (
@@ -43,6 +49,7 @@ SURVEYS = [
             "How well does the product fit your needs?",
             "How would you rate the value for money?",
         ],
+        None,
     ),
 ]
 SURVEY_WEIGHTS = [5, 3, 2]
@@ -211,8 +218,11 @@ class Generator:
 
     def _surveys(self):
         surveys = {}
-        for name, texts in SURVEYS:
-            survey = Survey.objects.create(name=name)
+        for name, texts, labels in SURVEYS:
+            survey = Survey.objects.create(
+                name=name,
+                rating_labels=None if labels is None else normalize_rating_labels(labels),
+            )
             survey.question_list = Question.objects.bulk_create(
                 [
                     Question(survey=survey, text=text, type=Question.RATING, order=order)
