@@ -78,7 +78,8 @@ def test_generated_rows_are_consistent():
     assert not Answer.objects.exclude(question__survey=F("response__survey")).exists()
     assert not Response.objects.exclude(ticket=None).exclude(ticket__customer=F("customer")).exists()
     assert not Answer.objects.exclude(created_at=F("response__submitted_at")).exists()
-    assert not Answer.objects.exclude(updated_at=F("response__submitted_at")).exists()
+    # Answers never edited were last touched when submitted (edited ones: see below).
+    assert not Answer.objects.filter(revisions=None).exclude(updated_at=F("response__submitted_at")).exists()
     ratings = Answer.objects.filter(question__type=Question.RATING)
     assert set(ratings.values_list("value", flat=True)) <= {"0", "1", "2", "3", "4", "5"}
 
@@ -160,3 +161,20 @@ def test_quarterly_check_in_has_an_optional_comment_question():
     assert 0 < answers.count() < asked  # optional: most respondents skip it
     for answer in answers:
         assert validate_comment(answer.value) == answer.value
+
+
+def test_some_rating_answers_have_a_believable_edit_history():
+    run(responses=400, seed=7, clear=True)
+
+    edited = Answer.objects.exclude(revisions=None).distinct()
+    assert edited.exists()
+    assert not edited.exclude(question__type=Question.RATING).exists()
+    for answer in edited.select_related("response").prefetch_related("revisions"):
+        revisions = list(answer.revisions.all())
+        assert 1 <= len(revisions) <= 2
+        # The first value was given at submission; values change at each step.
+        assert revisions[0].answered_at == answer.response.submitted_at
+        chain = [r.value for r in revisions] + [answer.value]
+        assert all(a != b for a, b in zip(chain, chain[1:]))
+        assert answer.updated_at > answer.response.submitted_at
+        assert answer.updated_at == revisions[-1].replaced_at

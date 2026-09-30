@@ -17,7 +17,7 @@ from django.db import connection, transaction
 from django.db.models import OuterRef, Subquery
 from django.utils import timezone
 
-from feedback.models import Answer, Customer, Option, Question, Response, Survey, Ticket
+from feedback.models import Answer, AnswerRevision, Customer, Option, Question, Response, Survey, Ticket
 from feedback.scales import normalize_rating_labels
 from feedback.validators import serialize_selection, validate_comment, validate_rating, validate_selection
 
@@ -116,6 +116,9 @@ DRAFT_RATE = 0.20
 SKIP_LATER_QUESTION_RATE = 0.05
 ANONYMOUS_CUSTOMER_RATE = 0.03
 LEGACY_ANSWER_RATE = 0.005
+# Rating answers the respondent later changed, once or twice (Req 4).
+EDITED_ANSWER_RATE = 0.03
+EDIT_COUNT_WEIGHTS = {1: 70, 2: 30}
 LEGACY_VALUE = "0"  # a score from the survey's earlier scale, as in `seed`
 HISTORY_DAYS = 180
 
@@ -159,7 +162,8 @@ class Command(BaseCommand):
                 f"in {time.monotonic() - started:.1f}s "
                 f"({stats['customers']} customers, {stats['tickets']} tickets, "
                 f"{stats['no_ticket']} without ticket, {stats['drafts']} drafts, "
-                f"{stats['skipped']} skipped answers, {stats['legacy']} legacy scores)."
+                f"{stats['skipped']} skipped answers, {stats['legacy']} legacy scores, "
+                f"{stats['edited']} edited answers)."
             )
         )
 
@@ -167,14 +171,17 @@ class Command(BaseCommand):
         # A bulk load leaves planner statistics stale until autovacuum gets to
         # them; timing right after seeding then measures bad plans (a rating
         # filter at 100K took ~390 ms before ANALYZE and ~75 ms after).
-        tables = [model._meta.db_table for model in (Answer, Response, Question, Ticket, Survey, Customer)]
+        tables = [
+            model._meta.db_table
+            for model in (AnswerRevision, Answer, Response, Question, Ticket, Survey, Customer)
+        ]
         with connection.cursor() as cursor:
             cursor.execute(f"ANALYZE {', '.join(tables)}")
 
     def _truncate(self):
         tables = [
             model._meta.db_table
-            for model in (Answer, Response, Question, Ticket, Survey, Customer)
+            for model in (AnswerRevision, Answer, Response, Question, Ticket, Survey, Customer)
         ]
         # Postgres-only, like the rest of the stack. RESTART IDENTITY makes ids
         # reproducible across runs with the same --seed.
@@ -199,7 +206,7 @@ class Generator:
         surveys = self._surveys()
         stats = {
             "customers": len(customers), "tickets": len(tickets), "responses": 0,
-            "answers": 0, "no_ticket": 0, "drafts": 0, "skipped": 0, "legacy": 0,
+            "answers": 0, "no_ticket": 0, "drafts": 0, "skipped": 0, "legacy": 0, "edited": 0,
         }
         answer_ids = []
 
@@ -220,8 +227,12 @@ class Generator:
             stats["responses"] += len(responses)
             stats["answers"] += len(answers)
 
-        stats["legacy"] = self._mark_legacy_scores(answer_ids)
+        legacy_ids = self._mark_legacy_scores(answer_ids)
+        stats["legacy"] = len(legacy_ids)
         self._align_answer_timestamps()
+        # After the timestamps are aligned, so edits can move them forward.
+        legacy = set(legacy_ids)
+        stats["edited"] = self._add_edits([i for i in answer_ids if i not in legacy])
         return stats
 
     def _customers(self, count):
@@ -319,7 +330,41 @@ class Generator:
         # handful of pre-rescale scores in the original seed.
         count = max(1, round(len(answer_ids) * LEGACY_ANSWER_RATE))
         ids = self.rng.sample(answer_ids, count)
-        return Answer.objects.filter(id__in=ids).update(value=LEGACY_VALUE)
+        Answer.objects.filter(id__in=ids).update(value=LEGACY_VALUE)
+        return ids
+
+    def _add_edits(self, rating_answer_ids):
+        """Give some rating answers a history, as if re-answered through an edit link.
+
+        Each keeps its current score; one or two earlier scores become
+        revisions, the first given when the response was submitted, and the
+        answer's updated_at moves to the last edit.
+        """
+        chosen = sorted(self.rng.sample(rating_answer_ids, round(len(rating_answer_ids) * EDITED_ANSWER_RATE)))
+        answers = Answer.objects.filter(id__in=chosen).select_related("response").order_by("id")
+        revisions, updated = [], []
+        for answer in answers:
+            edits = self.rng.choices(list(EDIT_COUNT_WEIGHTS), weights=EDIT_COUNT_WEIGHTS.values())[0]
+            submitted = answer.response.submitted_at
+            span = (self.anchor - submitted).total_seconds()
+            edit_times = sorted(submitted + timedelta(seconds=self.rng.uniform(0, span)) for _ in range(edits))
+            # Each earlier value differs from the one that replaced it.
+            values, later = [], int(answer.value)
+            for _ in range(edits):
+                earlier = self.rng.choice([score for score in RATING_WEIGHTS if score != later])
+                values.insert(0, str(earlier))
+                later = earlier
+            given_at = [submitted] + edit_times[:-1]
+            revisions += [
+                AnswerRevision(answer=answer, value=value, answered_at=at, replaced_at=replaced)
+                for value, at, replaced in zip(values, given_at, edit_times)
+            ]
+            answer.updated_at = edit_times[-1]
+            updated.append(answer)
+        AnswerRevision.objects.bulk_create(revisions)
+        # bulk_update does not apply auto_now, so the edit time is kept.
+        Answer.objects.bulk_update(updated, ["updated_at"])
+        return len(updated)
 
     def _align_answer_timestamps(self):
         # bulk_create applies auto_now_add/auto_now, stamping every answer with
