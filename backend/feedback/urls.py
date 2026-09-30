@@ -12,4 +12,6 @@ urlpatterns = [
         views.SurveyRatingLabelsView.as_view(),
         name="survey_rating_labels",
     ),
+    path("api/surveys/<int:survey_id>/questions/", views.SurveyQuestionsView.as_view(), name="survey_questions"),
+    path("api/surveys/<int:survey_id>/responses/", views.SurveyResponsesView.as_view(), name="survey_responses"),
 ]
