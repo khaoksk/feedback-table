@@ -75,6 +75,11 @@ Run these against the running stack from another terminal:
 
 ```bash
 docker compose exec web python manage.py seed --clear   # reset & reload sample data
+docker compose exec web python manage.py seed_bulk --responses 10000 --seed 42 --clear
+                                                        # replace ALL data with a large reproducible set
+docker compose run --rm web pytest                      # run the test suite (separate test database)
+docker compose exec web python manage.py time_feedback_table --runs 20
+                                                        # time /api/feedback-table/ on current data (Markdown report)
 docker compose exec web python manage.py migrate
 docker compose exec web python manage.py shell
 docker compose exec web python manage.py createsuperuser

@@ -74,6 +74,17 @@ class Response(models.Model):
         max_length=20, choices=STATUS_CHOICES, default=STATUS_COMPLETED
     )
 
+    class Meta:
+        # The feedback table pages through responses newest first, usually
+        # filtered by status. Postgres reads either index backwards for DESC.
+        indexes = [
+            models.Index(fields=["submitted_at", "id"], name="response_submitted_idx"),
+            models.Index(
+                fields=["status", "submitted_at", "id"],
+                name="response_status_submitted_idx",
+            ),
+        ]
+
     def __str__(self):
         return f"Response #{self.pk}"
 
@@ -86,6 +97,16 @@ class Answer(models.Model):
         Question, on_delete=models.CASCADE, related_name="answers"
     )
     value = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["response", "question"],
+                name="uniq_answer_response_question",
+            ),
+        ]
 
     def __str__(self):
         return f"Answer #{self.pk}"

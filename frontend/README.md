@@ -1,0 +1,41 @@
+# Feedback table frontend
+
+React + TypeScript (strict) app for the Feedback Table page, built with Vite.
+It talks to the Django API in `../backend` through Vite's dev proxy, so the
+browser stays on one origin and the backend needs no CORS setup.
+
+## Run
+
+Start the backend first (`cd ../backend && docker compose up`), then:
+
+```bash
+npm install
+npm run dev        # http://localhost:5173, proxies /api to http://localhost:8000
+```
+
+Set `API_TARGET` to proxy elsewhere, e.g. `API_TARGET=http://localhost:8001 npm run dev`.
+
+## Check
+
+```bash
+npm run lint       # ESLint, zero warnings allowed
+npm run build      # typecheck (tsc -b) + production build
+npm test           # Vitest + React Testing Library, API mocked with MSW
+```
+
+## Layout
+
+```text
+src/
+  api/                     types and fetch client for /api/surveys/ and /api/feedback-table/
+  features/feedback-table/
+    filters.ts             filter state: URL <-> state <-> API parameters
+    useUrlFilters.ts       filters stored in the query string (shareable, Back works)
+    columns.ts             Q1..Qn column positions
+    FeedbackTablePage.tsx  data loading, debounced search, wiring
+    Toolbar.tsx, FeedbackTable.tsx, AnswerCell.tsx, Pagination.tsx
+  test/                    Vitest setup and the MSW mock API
+```
+
+Answer cells style the backend's resolved `state` and never reinterpret raw
+values; the display rules are in `docs/PRD.md` §6.

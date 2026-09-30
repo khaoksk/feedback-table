@@ -1,0 +1,40 @@
+"""Turn stored answer values into what the feedback table shows.
+
+This is the single place that decides how a value is displayed, so the API,
+and anything built on it, never guesses from the raw string. Each answer is
+returned as its raw `value`, a human `display` string and a `state` the
+frontend styles on (see docs/PRD.md §6).
+"""
+from .models import Question
+
+DEFAULT_RATING_LABELS = {1: "Terrible", 2: "Bad", 3: "Okay", 4: "Good", 5: "Great"}
+LEGACY_RATING_LABEL = "Unrated"
+
+OK = "ok"
+LEGACY = "legacy"
+INVALID = "invalid"
+UNANSWERED = "unanswered"
+
+
+def resolve_answer(question, value):
+    """Resolve one question's answer; `value` is None when it was not answered."""
+    if value is None:
+        return _cell(None, None, UNANSWERED)
+    if question.type == Question.RATING:
+        return _resolve_rating(value, DEFAULT_RATING_LABELS)
+    return _cell(value, value, OK)
+
+
+def _resolve_rating(value, labels):
+    try:
+        score = int(value)
+    except (TypeError, ValueError):
+        return _cell(value, None, INVALID)
+    if score not in labels:
+        # A number from an older or different scale, e.g. the seeded "0".
+        return _cell(value, LEGACY_RATING_LABEL, LEGACY)
+    return _cell(value, labels[score], OK)
+
+
+def _cell(value, display, state):
+    return {"value": value, "display": display, "state": state}

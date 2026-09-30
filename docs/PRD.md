@@ -75,7 +75,7 @@ The brief says to extend the backend, not replace it; the legacy endpoint and pa
 **Pagination:** page number (DRF `PageNumberPagination`), default 50 per page.
 
 - At 10K rows `OFFSET` costs milliseconds; it gives the "Showing X of Y responses" count the design shows and allows jumping to any page
-- Deterministic order: `submitted_at DESC, id DESC`; index on `(submitted_at, id)` and on `status`
+- Deterministic order: `submitted_at DESC, id DESC`; indexes on `(submitted_at, id)` and `(status, submitted_at, id)`
 - `next` / `previous` are URLs, so a later move to cursor pagination needs minimal frontend change
 
 **Response shape:**
@@ -138,7 +138,7 @@ the same validator explicitly.
 | PR | Change | Why |
 |---|---|---|
 | Baseline | `Answer`: unique `(response, question)`, `created_at`, `updated_at` | Blocks duplicate answers before bulk data is generated. The seed has 0 duplicates; the migration fails with a clear message if any exist. Existing rows are backfilled from `Response.submitted_at`. |
-| Baseline | Indexes on `Response (submitted_at, id)` and `status` | Sorting and filtering at 10K+ |
+| Baseline | Indexes on `Response (submitted_at, id)` and `(status, submitted_at, id)` | Page through newest first without a sort step, with or without the status filter. A `status`-only index would go unused: two values, ~78% `completed`. |
 | Req 1 | Per-survey rating labels | Storage (JSON field vs table) decided in the Req 1 PR |
 | Req 2 | Question options | Storage of multi-select values decided in the Req 2 PR |
 | Req 4 | `AnswerRevision` (previous value + timestamp); `Answer` keeps the current value | Table reads one row per question (fast); full history; the design needs the original value and date. Revision and update are written in one transaction. |
@@ -156,6 +156,8 @@ a new `Answer` row per edit (needs a latest-per-group query and allows duplicate
 - Edge cases in proportions close to the design: ~20% without a ticket, drafts, skipped Q2, anonymous customers, legacy scores
 - Grows with each requirement PR (multi-select, comments, edited answers, conditional questions)
 - `--responses 100000` for performance reporting
+- Runs `ANALYZE` after loading: without it, timings taken right after a bulk load measure plans built on stale statistics (a rating filter at 100K took ~390 ms before and ~50–75 ms after)
+- `python manage.py time_feedback_table` prints the timing report (§9)
 
 ## 9. Quality
 
@@ -187,7 +189,7 @@ Response time is reported rather than gated, because it depends on the machine a
 
 ## 11. Open questions (decided in the PR where they arise)
 
-- `seed_bulk --clear` scope: everything, or only generated data (proposed: everything, with its own surveys)
+- ~~`seed_bulk --clear` scope~~ Decided in Issue #1: clears everything and creates its own surveys, so the same `--seed` reproduces identical data (ids included)
 - Column position after a question is archived: raw `order` or renumbered (Req 5)
 - A conditional question whose source question is archived (Req 6)
 - Which question types the rating filter offers once multi-select and comment exist (Req 2, 3)
@@ -196,7 +198,8 @@ Response time is reported rather than gated, because it depends on the machine a
 
 | Trigger | Change |
 |---|---|
-| Late pages get slow (hundreds of thousands to millions of rows) or `COUNT(*)` dominates | Cursor pagination on the existing `(submitted_at, id)` index |
+| Late pages get slow (hundreds of thousands to millions of rows) or `COUNT(*)` dominates | Cursor pagination on the existing `(submitted_at, id)` index. **Measured:** at 100K the last page takes ~195–220 ms against ~29 ms for page 1, because `OFFSET` walks and joins customer/ticket for every skipped row. A cheaper first step is a deferred join: page through ids only, then fetch the 50 rows with their joins. |
+| Rating filter across all surveys gets slow (millions of answers) | Index `Answer (question_id, value, response_id)`. **Measured at 100K and not added:** ~20% faster (59 vs 75 ms median) with a worse p95, not worth an extra index on the largest, most-written table yet. The ~390 ms first seen was stale statistics after bulk load, fixed by `ANALYZE`. |
 | Exact count too expensive | Approximate count (`pg_class.reltuples` / `EXPLAIN`) shown as "about N", or cache counts per filter set |
 | Very long result sets | "Load more" / infinite scroll with virtualised rows |
 | Legacy `/api/responses/` | Fix N+1 without changing its JSON, after adding tests that lock the current shape |
