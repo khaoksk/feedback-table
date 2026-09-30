@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 
 import type { Question, Survey } from '../../api/types'
+import { hiddenQuestions } from './conditions'
 
 /** Question id to a score (rating), option ids (multi-select) or text (comment). */
 export type Answers = Record<string, number | number[] | string>
@@ -42,7 +43,13 @@ export function ResponseForm({
   const [contact, setContact] = useState<Contact>(knownContact ?? { name: '', email: '', company: '' })
   const [answers, setAnswers] = useState<Answers>(initialAnswers)
 
-  const answered = Object.keys(answers).length
+  // Recomputed on every change, so later questions appear and disappear as
+  // earlier ratings are picked (Req 6).
+  const hidden = hiddenQuestions(survey.questions, answers)
+  const visibleAnswers = Object.fromEntries(
+    Object.entries(answers).filter(([questionId]) => !hidden.has(Number(questionId))),
+  )
+  const answered = Object.keys(visibleAnswers).length
   // Saved answers cannot be removed by an edit (docs/PRD.md §11); say so
   // rather than silently keeping them.
   const kept = survey.questions.filter((q) => String(q.id) in initialAnswers && !(String(q.id) in answers))
@@ -61,7 +68,8 @@ export function ResponseForm({
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    onSubmit(answers, contact)
+    // Answers to questions hidden now are not sent: the API would reject them.
+    onSubmit(visibleAnswers, contact)
   }
 
   return (
@@ -103,7 +111,14 @@ export function ResponseForm({
         </>
       )}
 
-      {survey.questions.map((question) => (
+      {survey.questions.map((question) =>
+        hidden.has(question.id) ? (
+          String(question.id) in initialAnswers && (
+            <p key={question.id} className="hint kept-note">
+              Q{question.order} is hidden by its condition; your earlier answer to it is kept.
+            </p>
+          )
+        ) : (
         <fieldset key={question.id} className="form-row question">
           <legend>
             Q{question.order}. {question.text}
@@ -132,7 +147,8 @@ export function ResponseForm({
             <p className="hint kept-note">Your saved answer is kept: answers can be changed but not removed.</p>
           )}
         </fieldset>
-      ))}
+        ),
+      )}
 
       {errors.length > 0 && (
         <ul className="error" role="alert">

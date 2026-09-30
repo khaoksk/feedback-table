@@ -24,7 +24,7 @@ export function AnswerCell({ question, answer, scale, showQuestionText }: Props)
 
   return (
     <td className="qcell" data-state={answer.state}>
-      {showQuestionText && answer.state !== 'unanswered' && (
+      {showQuestionText && answer.state !== 'unanswered' && answer.state !== 'condition_not_met' && (
         <span className="qtext">
           {question.text}
           <span className="qtype">{question.type}</span>
@@ -65,6 +65,9 @@ function AnswerValue({ answer, scale }: { answer: AnswerCellData; scale: number[
       )
     case 'unanswered':
       return <span className="qcell-blank">blank — not answered</span>
+    case 'condition_not_met':
+      // The design's wording; distinct from a question that was shown and skipped.
+      return <span className="qcell-blank">blank — condition not met</span>
     case 'removed_option':
       // Only multi-select answers can reference a removed option (handled above).
       return <span className="qcell-blank">{answer.display}</span>

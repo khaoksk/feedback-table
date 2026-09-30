@@ -6,8 +6,8 @@ import { route } from '../../routes'
 import { AnswerCell } from './AnswerCell'
 import { editedNote } from './editedNote'
 
-const rating: Question = { id: 11, order: 1, text: 'How satisfied?', type: 'rating', options: [] }
-const comment: Question = { id: 33, order: 3, text: 'Anything else?', type: 'comment', options: [] }
+const rating: Question = { id: 11, order: 1, text: 'How satisfied?', type: 'rating', options: [], condition: null }
+const comment: Question = { id: 33, order: 3, text: 'Anything else?', type: 'comment', options: [], condition: null }
 
 function renderCell(question: Question, answer: AnswerCellData) {
   render(

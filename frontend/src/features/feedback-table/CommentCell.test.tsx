@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import type { Question } from '../../api/types'
 import { AnswerCell, COMMENT_PREVIEW_CHARS } from './AnswerCell'
 
-const comment: Question = { id: 33, order: 3, text: 'Anything you would add?', type: 'comment', options: [] }
+const comment: Question = { id: 33, order: 3, text: 'Anything you would add?', type: 'comment', options: [], condition: null }
 
 function renderComment(text: string) {
   render(

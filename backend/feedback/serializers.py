@@ -110,3 +110,15 @@ class OptionsUpdateSerializer(serializers.Serializer):
         if len(set(folded)) != len(folded):
             raise serializers.ValidationError("Each option needs a different label.")
         return options
+
+
+class ConditionSerializer(serializers.Serializer):
+    question_id = serializers.IntegerField()
+    operator = serializers.CharField(max_length=2)
+    value = serializers.IntegerField()
+
+
+class ConditionUpdateSerializer(serializers.Serializer):
+    """Body of PUT /api/questions/<id>/condition/: a condition, or null to clear it."""
+
+    condition = ConditionSerializer(allow_null=True)

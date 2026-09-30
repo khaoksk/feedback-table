@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
+from .conditions import hidden_questions
 from .models import Answer, AnswerRevision, Customer, Question, Response
 from .scales import rating_scale
 from .validators import parse_selection, serialize_selection, validate_comment, validate_rating, validate_selection
@@ -55,6 +56,24 @@ def clean_answers(survey, raw_answers):
     if errors:
         raise AnswerErrors(errors)
     return cleaned
+
+
+def check_conditions(survey, cleaned, existing=None):
+    """Reject answers to questions hidden by their condition (Req 6).
+
+    `existing` holds a response's saved values when editing: a kept answer to
+    a now-hidden question stays, but a new one cannot be sent for it.
+    """
+    values = dict(existing or {})
+    values.update({question.id: value for question, value in cleaned})
+    hidden = hidden_questions(survey.questions.all(), values)
+    errors = {
+        str(question.id): ["This question is hidden by its condition, so it cannot be answered."]
+        for question, _ in cleaned
+        if question.id in hidden
+    }
+    if errors:
+        raise AnswerErrors(errors)
 
 
 @transaction.atomic

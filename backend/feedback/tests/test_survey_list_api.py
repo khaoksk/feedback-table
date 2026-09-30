@@ -24,8 +24,8 @@ def test_lists_every_survey_with_ordered_questions(django_assert_num_queries):
         "rating_scale": DEFAULT_SCALE,
         "custom_labels": False,
         "questions": [
-            {"id": q1.id, "order": 1, "text": "How satisfied?", "type": "rating", "options": []},
-            {"id": q2.id, "order": 2, "text": "How fast?", "type": "rating", "options": []},
+            {"id": q1.id, "order": 1, "text": "How satisfied?", "type": "rating", "options": [], "condition": None},
+            {"id": q2.id, "order": 2, "text": "How fast?", "type": "rating", "options": [], "condition": None},
         ],
     }
     assert [q["order"] for q in data[1]["questions"]] == [1, 2, 3]

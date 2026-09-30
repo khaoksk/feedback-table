@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { AnswerCell as AnswerCellData, Question } from '../../api/types'
 import { AnswerCell } from './AnswerCell'
 
-const question: Question = { id: 11, order: 1, text: 'How satisfied were you?', type: 'rating', options: [] }
+const question: Question = { id: 11, order: 1, text: 'How satisfied were you?', type: 'rating', options: [], condition: null }
 
 const ONE_TO_FIVE = [1, 2, 3, 4, 5]
 
@@ -104,7 +104,7 @@ describe('AnswerCell on a custom scale', () => {
 })
 
 describe('AnswerCell for multi-select answers', () => {
-  const multiselect: Question = { id: 32, order: 2, text: 'What helped?', type: 'multiselect', options: [] }
+  const multiselect: Question = { id: 32, order: 2, text: 'What helped?', type: 'multiselect', options: [], condition: null }
 
   it('shows each chosen option as a chip', () => {
     renderCell(

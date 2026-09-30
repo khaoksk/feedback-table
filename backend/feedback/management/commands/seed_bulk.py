@@ -18,6 +18,7 @@ from django.db.models import OuterRef, Subquery
 from django.utils import timezone
 
 from feedback.models import Answer, AnswerRevision, Customer, Option, Question, Response, Survey, Ticket
+from feedback.conditions import condition_met, set_condition
 from feedback.questions import archive_question
 from feedback.scales import normalize_rating_labels
 from feedback.validators import serialize_selection, validate_comment, validate_rating, validate_selection
@@ -118,6 +119,11 @@ COMMENT_ANSWER_RATE = 0.4  # comments are optional; most people skip them
 # Multi-select answers that also picked an option removed since (Req 5).
 REMOVED_OPTION_RATE = 0.08
 ARCHIVED_QUESTION_AGE = timedelta(days=45)
+# Conditional display (Req 6), as in the design reference: the comment shows
+# only when the first rating is above 2. (survey, question, source, op, threshold)
+CONDITIONS = [
+    ("Quarterly Check-in", "Anything you would add?", "How likely are you to recommend us?", ">", 2),
+]
 
 # How many options a multi-select answer picks.
 SELECTION_SIZE_WEIGHTS = {1: 45, 2: 35, 3: 20}
@@ -174,7 +180,8 @@ class Command(BaseCommand):
                 f"({stats['customers']} customers, {stats['tickets']} tickets, "
                 f"{stats['no_ticket']} without ticket, {stats['drafts']} drafts, "
                 f"{stats['skipped']} skipped answers, {stats['legacy']} legacy scores, "
-                f"{stats['edited']} edited answers, {stats['removed_options']} answers with a removed option)."
+                f"{stats['edited']} edited answers, {stats['removed_options']} answers with a removed option, "
+                f"{stats['hidden']} questions hidden by a condition)."
             )
         )
 
@@ -218,7 +225,7 @@ class Generator:
         stats = {
             "customers": len(customers), "tickets": len(tickets), "responses": 0,
             "answers": 0, "no_ticket": 0, "drafts": 0, "skipped": 0, "legacy": 0, "edited": 0,
-            "removed_options": 0,
+            "removed_options": 0, "hidden": 0,
         }
         answer_ids = []
 
@@ -308,6 +315,12 @@ class Generator:
                 if question.archive_later:
                     # Renumbers the survey's later questions, as the API would.
                     archive_question(question, when=self.anchor - ARCHIVED_QUESTION_AGE)
+            by_text = {question.text: question for question in survey.question_list}
+            for survey_name, text, source_text, op, threshold in CONDITIONS:
+                if survey_name == name:
+                    # Same checks as the API: earlier, active, rating source.
+                    by_text[text].refresh_from_db(fields=["order"])
+                    set_condition(by_text[text], by_text[source_text].id, op, threshold)
             surveys[survey.id] = survey
         return surveys
 
@@ -328,7 +341,14 @@ class Generator:
 
     def _answers(self, response, survey, stats):
         answers = []
+        given = {}
         for question in survey.question_list:
+            # A question hidden by its condition was never shown, so never answered.
+            if question.condition_question_id and not condition_met(
+                question, given.get(question.condition_question_id)
+            ):
+                stats["hidden"] += 1
+                continue
             # Only later questions are skipped, matching the design's "skipped Q2".
             if question.order > 1 and self.rng.random() < SKIP_LATER_QUESTION_RATE:
                 stats["skipped"] += 1
@@ -349,6 +369,7 @@ class Generator:
             else:
                 value = str(self.rng.choices(list(RATING_WEIGHTS), weights=RATING_WEIGHTS.values())[0])
                 validate_rating(value)
+            given[question.id] = value
             answers.append(Answer(response=response, question=question, value=value))
         return answers
 
