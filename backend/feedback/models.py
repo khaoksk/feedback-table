@@ -1,4 +1,8 @@
+from django.core.exceptions import ValidationError
 from django.db import models
+
+from .scales import normalize_rating_labels, rating_scale
+from .validators import validate_rating
 
 
 class Customer(models.Model):
@@ -23,6 +27,16 @@ class Ticket(models.Model):
 
 class Survey(models.Model):
     name = models.CharField(max_length=200)
+    # {"1": "Terrible", ...}; the keys are the survey's scale. Null means the
+    # default labels (feedback/scales.py).
+    rating_labels = models.JSONField(null=True, blank=True)
+
+    def clean(self):
+        if self.rating_labels is not None:
+            try:
+                self.rating_labels = normalize_rating_labels(self.rating_labels)
+            except ValidationError as error:
+                raise ValidationError({"rating_labels": error.messages})
 
     def __str__(self):
         return self.name
@@ -107,6 +121,18 @@ class Answer(models.Model):
                 name="uniq_answer_response_question",
             ),
         ]
+
+    def clean(self):
+        # Runs for the admin and model forms; the write API calls the same
+        # validators. bulk_create skips it, so seed_bulk validates explicitly.
+        if self.question_id is None:
+            return
+        if self.question.type == Question.RATING:
+            scale = rating_scale(self.question.survey)
+            try:
+                validate_rating(self.value, range(scale[0], scale[-1] + 1))
+            except ValidationError as error:
+                raise ValidationError({"value": error.messages})
 
     def __str__(self):
         return f"Answer #{self.pk}"

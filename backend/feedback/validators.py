@@ -1,7 +1,9 @@
 from django.core.exceptions import ValidationError
 
-# Until surveys define their own labels (Req 1), every rating uses this scale.
-DEFAULT_RATING_SCALE = range(1, 6)
+from .scales import DEFAULT_RATING_LABELS
+
+# The scale of a survey without custom labels; see scales.rating_scale.
+DEFAULT_RATING_SCALE = range(min(DEFAULT_RATING_LABELS), max(DEFAULT_RATING_LABELS) + 1)
 
 
 def validate_rating(value, scale=DEFAULT_RATING_SCALE):
