@@ -14,4 +14,5 @@ urlpatterns = [
     ),
     path("api/surveys/<int:survey_id>/questions/", views.SurveyQuestionsView.as_view(), name="survey_questions"),
     path("api/surveys/<int:survey_id>/responses/", views.SurveyResponsesView.as_view(), name="survey_responses"),
+    path("api/responses/<int:response_id>/edit/", views.ResponseEditView.as_view(), name="response_edit"),
 ]

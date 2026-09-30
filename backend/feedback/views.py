@@ -1,8 +1,7 @@
-from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Exists, Max, OuterRef, Prefetch, Q
+from django.http import Http404
 from django.shortcuts import get_object_or_404, render
-from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import GenericAPIView
@@ -11,16 +10,24 @@ from rest_framework.response import Response as ApiResponse
 from rest_framework.views import APIView
 
 from .display import resolve_answer
-from .models import Answer, Customer, Option, Question, Response, Survey, Ticket
-from .scales import rating_labels, rating_scale
+from .models import Answer, AnswerRevision, Customer, Option, Question, Response, Survey, Ticket
+from .scales import rating_labels
 from .serializers import (
     STATUS_ALL,
     FeedbackTableParamsSerializer,
     QuestionCreateSerializer,
     RatingLabelsSerializer,
     ResponseCreateSerializer,
+    ResponseEditSerializer,
 )
-from .validators import serialize_selection, validate_comment, validate_rating, validate_selection
+from .submissions import (
+    AnswerErrors,
+    answer_as_input,
+    clean_answers,
+    create_response,
+    edit_response,
+    token_matches,
+)
 
 
 class ResponseListView(APIView):
@@ -178,7 +185,8 @@ class SurveyResponsesView(APIView):
     A rating answer is a score, a multi-select answer a list of option ids,
     a comment answer text (trimmed, at most 2,000 characters).
     Questions may be skipped, but at least one must be answered. The customer
-    is matched by email (case-insensitive) or created.
+    is matched by email (case-insensitive) or created. The reply carries the
+    edit token for the respondent's private edit link (Req 4).
     """
 
     authentication_classes = []  # see SurveyRatingLabelsView
@@ -188,55 +196,59 @@ class SurveyResponsesView(APIView):
         serializer = ResponseCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        answers = self._clean_answers(survey, data["answers"])
+        try:
+            cleaned = clean_answers(survey, data["answers"])
+        except AnswerErrors as error:
+            raise ValidationError({"answers": error.errors})
 
-        with transaction.atomic():
-            customer = Customer.objects.filter(email__iexact=data["email"]).first()
-            if customer is None:
-                customer = Customer.objects.create(
-                    name=data["name"].strip(), email=data["email"], company=data["company"].strip()
-                )
-            response = Response.objects.create(
-                survey=survey,
-                customer=customer,
-                submitted_at=timezone.now(),
-                status=Response.STATUS_COMPLETED,
-            )
-            Answer.objects.bulk_create(
-                Answer(response=response, question=question, value=value)
-                for question, value in answers
-            )
+        response = create_response(survey, data["email"], data["name"], data["company"], cleaned)
+        return ApiResponse({"id": response.id, "edit_token": response.edit_token}, status=status.HTTP_201_CREATED)
 
-        return ApiResponse({"id": response.id}, status=status.HTTP_201_CREATED)
 
-    def _clean_answers(self, survey, raw_answers):
-        """Check every answer against its question; return [(question, stored value)]."""
-        questions = {str(question.id): question for question in survey.questions.all()}
-        scale = rating_scale(survey)
-        errors, cleaned = {}, []
-        for key, value in raw_answers.items():
-            question = questions.get(str(key))
-            if question is None:
-                errors[str(key)] = ["Not a question of this survey."]
-                continue
-            try:
-                if question.type == Question.RATING:
-                    # bool is an int subclass; a checkbox value must not pass as 1.
-                    if type(value) is not int:
-                        raise DjangoValidationError("A rating must be a whole number.")
-                    validate_rating(str(value), range(scale[0], scale[-1] + 1))
-                    cleaned.append((question, str(value)))
-                elif question.type == Question.COMMENT:
-                    cleaned.append((question, validate_comment(value)))
-                else:
-                    active = {o.id for o in question.options.all() if o.archived_at is None}
-                    ids = validate_selection(value, active)
-                    cleaned.append((question, serialize_selection(ids)))
-            except DjangoValidationError as error:
-                errors[str(key)] = error.messages
-        if errors:
-            raise ValidationError({"answers": errors})
-        return cleaned
+class ResponseEditView(APIView):
+    """A respondent's private edit link: GET the response, PUT changed answers.
+
+    Both need ?token=... from the link. A wrong or missing token is a 404, the
+    same as a response that does not exist, so ids cannot be probed.
+    """
+
+    authentication_classes = []  # see SurveyRatingLabelsView
+
+    def _response(self, request, response_id):
+        response = Response.objects.select_related("customer").filter(pk=response_id).first()
+        if response is None or not token_matches(response, request.query_params.get("token")):
+            raise Http404
+        response.survey = surveys_with_questions().get(pk=response.survey_id)
+        return response
+
+    def get(self, request, response_id):
+        response = self._response(request, response_id)
+        questions = {question.id: question for question in response.survey.questions.all()}
+        return ApiResponse({
+            "id": response.id,
+            "survey_id": response.survey_id,
+            "customer": {
+                "name": response.customer.name,
+                "email": response.customer.email,
+                "company": response.customer.company,
+            },
+            "answers": {
+                str(answer.question_id): answer_as_input(questions[answer.question_id], answer.value)
+                for answer in response.answers.all()
+                if answer.question_id in questions
+            },
+        })
+
+    def put(self, request, response_id):
+        response = self._response(request, response_id)
+        serializer = ResponseEditSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            cleaned = clean_answers(response.survey, serializer.validated_data["answers"])
+        except AnswerErrors as error:
+            raise ValidationError({"answers": error.errors})
+
+        return ApiResponse({"id": response.id, "changed": edit_response(response, cleaned)})
 
 
 class FeedbackTablePagination(PageNumberPagination):
@@ -248,8 +260,9 @@ class FeedbackTablePagination(PageNumberPagination):
 class FeedbackTableView(GenericAPIView):
     """One row per response, with answers keyed by question id.
 
-    Query count is fixed per page (count, rows, answers, surveys, questions,
-    options), whatever the page size or total number of responses.
+    Query count is fixed per page (count, rows, answers, answer revisions,
+    surveys, questions, options), whatever the page size or total number of
+    responses.
     """
 
     pagination_class = FeedbackTablePagination
@@ -280,7 +293,15 @@ class FeedbackTableView(GenericAPIView):
 
     def _responses(self, params):
         queryset = Response.objects.select_related("customer", "ticket").prefetch_related(
-            Prefetch("answers", queryset=Answer.objects.only("id", "response_id", "question_id", "value"))
+            Prefetch(
+                "answers",
+                queryset=Answer.objects.only("id", "response_id", "question_id", "value").prefetch_related(
+                    Prefetch(
+                        "revisions",
+                        queryset=AnswerRevision.objects.only("id", "answer_id", "value", "answered_at"),
+                    )
+                ),
+            )
         )
 
         if params["status"] != STATUS_ALL:
@@ -320,7 +341,7 @@ class FeedbackTableView(GenericAPIView):
         return {survey.id: survey for survey in surveys_with_questions().filter(id__in=survey_ids)}
 
     def _row(self, response, survey, labels, options):
-        values = {answer.question_id: answer.value for answer in response.answers.all()}
+        answers = {answer.question_id: answer for answer in response.answers.all()}
         return {
             "id": response.id,
             "submitted_at": response.submitted_at,
@@ -337,9 +358,22 @@ class FeedbackTableView(GenericAPIView):
             ),
             "survey_id": response.survey_id,
             "answers": {
-                str(question.id): resolve_answer(
-                    question, values.get(question.id), labels, options[question.id]
-                )
+                str(question.id): self._cell(question, answers.get(question.id), labels, options[question.id])
                 for question in survey.questions.all()
             },
         }
+
+    def _cell(self, question, answer, labels, options):
+        cell = resolve_answer(question, answer.value if answer else None, labels, options)
+        revisions = list(answer.revisions.all()) if answer else []
+        if revisions:
+            # The design's "Originally X on DATE", plus how many edits happened
+            # since: the first value does not change however often it is edited.
+            original = revisions[0]
+            cell["edited"] = {
+                "original_value": original.value,
+                "original_display": resolve_answer(question, original.value, labels, options)["display"],
+                "original_at": original.answered_at,
+                "edit_count": len(revisions),
+            }
+        return cell

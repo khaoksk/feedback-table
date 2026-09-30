@@ -249,10 +249,10 @@ def test_query_count_does_not_grow_with_rows(client, csat, django_assert_num_que
         respond(survey, {q1: "4", q2: "5"}, minutes=minute, ticket=TicketFactory())
         respond(other, {other_q: "2"}, minutes=minute, ticket=None)
 
-    # count, rows (+customer, ticket), answers, surveys, questions, options
-    with django_assert_num_queries(6):
+    # count, rows (+customer, ticket), answers, revisions, surveys, questions, options
+    with django_assert_num_queries(7):
         small = get(client, page_size=5)
-    with django_assert_num_queries(6):
+    with django_assert_num_queries(7):
         large = get(client, page_size=60)
 
     assert len(small["results"]) == 5

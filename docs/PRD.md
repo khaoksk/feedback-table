@@ -123,7 +123,7 @@ submitting / resubmitting responses are added in the requirement PRs that need t
 | Question shown but not answered | `unanswered` | Muted italic "blank — not answered" |
 | Question hidden by its condition | `condition_not_met` | Muted italic "blank — condition not met" |
 | Survey has no question at this column position | `not_applicable` | Empty cell |
-| Answer was resubmitted | (extra field) | "edited" tag, tooltip "Originally X on DATE" |
+| Answer was resubmitted | (extra field) | "edited" tag, tooltip "Originally X on DATE · edited N times": the **first** value, which is what a support lead needs (how the customer felt before any follow-up) and does not change with later edits; N tells them there were edits in between. The full history stays in `AnswerRevision`. |
 | Customer has no name | — | "Anonymous" |
 
 **Legacy vs invalid:** any out-of-range *number* is `legacy`; `invalid` is only for non-numbers and empty values.
@@ -145,6 +145,7 @@ the same validator explicitly.
 | Req 2 | `Option` table (id, question, label, order, `archived_at`); multi-select answers store option **ids** as a JSON list in `Answer.value` | Not JSON strings as in the design reference: renaming "Docs" to "Documentation" would orphan old answers and show a live option as removed. Ids keep answers pointing at the option, the table shows its current label, and archived ids render as the design's dashed "removed" chip (Req 5). |
 | Req 3 | `Question.type` gains `comment`; the text is stored as-is (trimmed) in `Answer.value`, at most **2,000 characters** | Shares the column, as the brief asks. The resolver branches on question type, so a comment such as `"5"` is never read as a score. 2,000 characters leaves room for real feedback and keeps the table payload bounded (50 rows × a few comment columns). Empty or whitespace-only comments are rejected on write. |
 | Req 4 | `AnswerRevision` (previous value + timestamp); `Answer` keeps the current value | Table reads one row per question (fast); full history; the design needs the original value and date. Revision and update are written in one transaction. |
+| Req 4 | `Response.edit_token`: a random secret created with the response | There is no login, so the respondent gets a private edit link (`/respond/<id>?token=…`) after submitting. The token stops anyone who guesses an id from editing; a wrong token looks exactly like a missing response (404). Seeded responses have no token and cannot be edited. |
 | Req 5 | `Question.archived_at` (soft delete) instead of cascading deletes | Answers are never lost. Archived questions are hidden from columns and forms. |
 | Req 6 | Display condition on `Question` (source question, operator, threshold) | Validated: the source comes earlier, is a rating question, and there are no cycles |
 
@@ -175,7 +176,7 @@ couple two concepts that change for different reasons.
 | Frontend tests | Vitest + React Testing Library + MSW |
 | E2E | One Playwright smoke test (open table → filter → change page), if time allows |
 | CI | GitHub Actions with a Postgres service, on every PR |
-| Performance gate (CI) | `assertNumQueries`: a page of 50 rows uses the same number of queries as a page of 5 (5 queries; 6 from Req 2, which prefetches question options) |
+| Performance gate (CI) | `assertNumQueries`: a page of 50 rows uses the same number of queries as a page of 5 (5 queries; 6 from Req 2, which prefetches question options; 7 from Req 4, which prefetches answer revisions) |
 | Performance report (per PR) | Script timing page 1 and the last page: target < 300 ms at 10K; 100K reported only |
 | Lint | flake8 (existing `.flake8`); TypeScript `strict` + ESLint |
 
@@ -205,6 +206,7 @@ Response time is reported rather than gated, because it depends on the machine a
 - Column position after a question is archived: raw `order` or renumbered (Req 5)
 - A conditional question whose source question is archived (Req 6)
 - ~~Which question types the rating filter offers~~ Decided in Req 2: rating questions only. Across all surveys it filters by position, and a survey whose question at that position is not a rating simply has no matches.
+- ~~How a respondent re-answers~~ Decided in Req 4: a private edit link with a random token. On edit, questions left out keep their answer and answers cannot be removed, so no history is lost; a skipped question can be answered later. Unchanged values create no revision.
 
 ## 12. Future work
 

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
-import type { AnswerCell as AnswerCellData, Question, Selection } from '../../api/types'
+import type { AnswerCell as AnswerCellData, EditedInfo, Question, Selection } from '../../api/types'
+import { editedNote } from './editedNote'
 import { toneFor } from './scales'
 
 interface Props {
@@ -34,6 +35,7 @@ export function AnswerCell({ question, answer, scale, showQuestionText }: Props)
       ) : (
         <AnswerValue answer={answer} scale={scale} />
       )}
+      {answer.edited && <EditedTag question={question} edited={answer.edited} />}
     </td>
   )
 }
@@ -67,6 +69,15 @@ function AnswerValue({ answer, scale }: { answer: AnswerCellData; scale: number[
       // Only multi-select answers can reference a removed option (handled above).
       return <span className="qcell-blank">{answer.display}</span>
   }
+}
+
+function EditedTag({ question, edited }: { question: Question; edited: EditedInfo }) {
+  const note = editedNote(question, edited)
+  return (
+    <span className="edited-tag" title={note} tabIndex={0} aria-label={`edited: ${note}`}>
+      edited
+    </span>
+  )
 }
 
 /** Comments longer than this start collapsed to a few lines. */
