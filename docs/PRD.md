@@ -139,14 +139,19 @@ the same validator explicitly.
 |---|---|---|
 | Baseline | `Answer`: unique `(response, question)`, `created_at`, `updated_at` | Blocks duplicate answers before bulk data is generated. The seed has 0 duplicates; the migration fails with a clear message if any exist. Existing rows are backfilled from `Response.submitted_at`. |
 | Baseline | Indexes on `Response (submitted_at, id)` and `(status, submitted_at, id)` | Page through newest first without a sort step, with or without the status filter. A `status`-only index would go unused: two values, ~78% `completed`. |
-| Req 1 | Per-survey rating labels | Storage (JSON field vs table) decided in the Req 1 PR |
-| Req 2 | Question options | Storage of multi-select values decided in the Req 2 PR |
+| Req 1 | `Survey.rating_labels`: nullable JSON `{score: label}`; `null` means the default Terrible…Great set. **The keys define the scale** (consecutive whole numbers), so a survey can also use e.g. 0–10. | An answer stores the score, and the score is the key, so renaming a label shows the new wording with no migration (Req 5). Out-of-scale scores fall into the existing `legacy` rule. Labels load with the survey (0 extra queries) and are edited as one set. Integrity is validated in `Survey.clean()` and the API serializer, since a `RatingLabel` table would only add database constraints for ~5 rows always edited together. |
+| Req 2 | `Option` table (id, question, label, order, `archived_at`); multi-select answers store option **ids** | Not JSON strings as in the design reference: renaming "Docs" to "Documentation" would orphan old answers and show a live option as removed. Ids keep answers pointing at the option, the table shows its current label, and archived ids render as the design's dashed "removed" chip (Req 5). |
 | Req 4 | `AnswerRevision` (previous value + timestamp); `Answer` keeps the current value | Table reads one row per question (fast); full history; the design needs the original value and date. Revision and update are written in one transaction. |
 | Req 5 | `Question.archived_at` (soft delete) instead of cascading deletes | Answers are never lost. Archived questions are hidden from columns and forms. |
 | Req 6 | Display condition on `Question` (source question, operator, threshold) | Validated: the source comes earlier, is a rating question, and there are no cycles |
 
 **Alternatives rejected for re-answers:** overwrite with one previous value (loses history after the second edit);
 a new `Answer` row per edit (needs a latest-per-group query and allows duplicates again).
+
+**Alternative rejected for labels and options:** one shared "choices" table for both. Rating scores are ordered
+numbers that conditions (Req 6) compare and that already act as stable keys; options are an unordered set that
+answers pick from and that need ids of their own. Sharing a table would give scores ids they do not need and
+couple two concepts that change for different reasons.
 
 ## 8. Data for demo and performance
 
@@ -190,6 +195,10 @@ Response time is reported rather than gated, because it depends on the machine a
 ## 11. Open questions (decided in the PR where they arise)
 
 - ~~`seed_bulk --clear` scope~~ Decided in Issue #1: clears everything and creates its own surveys, so the same `--seed` reproduces identical data (ids included)
+- ~~Rating label storage and whether a survey can change its scale~~ Decided before Req 1: JSON on `Survey`, keys define the scale (§7)
+- ~~Multi-select option storage~~ Decided before Req 1, so Req 1 does not paint Req 2 into a corner: `Option` table, answers store ids (§7)
+- How multi-select option ids are stored in `Answer.value` (e.g. a JSON list of ids) and filtered on (Req 2)
+- Rating chips when surveys use different scales: the chips offer the scores of the selected survey, or all scores seen across surveys (Req 1)
 - Column position after a question is archived: raw `order` or renumbered (Req 5)
 - A conditional question whose source question is archived (Req 6)
 - Which question types the rating filter offers once multi-select and comment exist (Req 2, 3)

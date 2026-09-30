@@ -14,7 +14,12 @@ describe('columnCount', () => {
   })
 
   it('follows order values, not question counts', () => {
-    const gappy = { id: 9, name: 'Gappy', questions: [{ id: 1, order: 4, text: 'x', type: 'rating' }] }
+    const gappy = {
+      ...SURVEYS[0],
+      id: 9,
+      name: 'Gappy',
+      questions: [{ id: 1, order: 4, text: 'x', type: 'rating' }],
+    }
     expect(columnCount([gappy])).toBe(4)
   })
 })

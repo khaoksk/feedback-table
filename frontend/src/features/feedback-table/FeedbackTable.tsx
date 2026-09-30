@@ -45,6 +45,7 @@ export function FeedbackTable({ rows, surveysById, columns, survey, ordering, on
         <tbody>
           {rows.map((row) => {
             const rowSurvey = surveysById.get(row.survey_id)
+            const scale = rowSurvey?.rating_scale.map((point) => point.score) ?? []
             return (
               <tr key={row.id}>
                 <td>
@@ -72,6 +73,7 @@ export function FeedbackTable({ rows, surveysById, columns, survey, ordering, on
                       key={position}
                       question={question}
                       answer={question ? row.answers[String(question.id)] : undefined}
+                      scale={scale}
                       showQuestionText={!survey}
                     />
                   )

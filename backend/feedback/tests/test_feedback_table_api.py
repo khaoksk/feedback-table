@@ -6,6 +6,7 @@ from rest_framework.test import APIClient
 from feedback.models import Answer, Response
 
 from .factories import (
+    DEFAULT_SCALE,
     CustomerFactory,
     QuestionFactory,
     ResponseFactory,
@@ -114,6 +115,8 @@ def test_surveys_on_the_page_are_described_with_ordered_questions(client, csat):
     assert surveys == {
         str(survey.id): {
             "name": "CSAT",
+            "rating_scale": DEFAULT_SCALE,
+            "custom_labels": False,
             "questions": [
                 {"id": q1.id, "order": 1, "text": "How satisfied?", "type": "rating"},
                 {"id": q2.id, "order": 2, "text": "How fast?", "type": "rating"},

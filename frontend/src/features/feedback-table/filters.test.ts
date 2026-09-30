@@ -154,3 +154,11 @@ describe('rating question scope', () => {
     expect(withSurvey(DEFAULT_FILTERS, 1, SURVEYS, 3)).toMatchObject({ rating: null, ratingQuestion: null })
   })
 })
+
+describe('rating chips follow the scale in view', () => {
+  it('drops a score the newly selected survey does not have', () => {
+    const onTen = { ...DEFAULT_FILTERS, survey: 2, rating: 9, ratingQuestion: 21 }
+
+    expect(withSurvey(onTen, 1, SURVEYS, 3)).toMatchObject({ survey: 1, rating: null, ratingQuestion: 11 })
+  })
+})

@@ -16,9 +16,18 @@ export interface Question {
   type: string
 }
 
+export interface RatingPoint {
+  score: number
+  label: string
+}
+
 export interface Survey {
   id: number
   name: string
+  /** The survey's scale in score order, with its current labels. */
+  rating_scale: RatingPoint[]
+  /** False when the survey uses the default Terrible…Great labels. */
+  custom_labels: boolean
   questions: Question[]
 }
 

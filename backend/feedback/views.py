@@ -1,5 +1,5 @@
 from django.db.models import Exists, OuterRef, Prefetch, Q
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from rest_framework.generics import GenericAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response as ApiResponse
@@ -7,7 +7,8 @@ from rest_framework.views import APIView
 
 from .display import resolve_answer
 from .models import Answer, Customer, Question, Response, Survey, Ticket
-from .serializers import STATUS_ALL, FeedbackTableParamsSerializer
+from .scales import rating_labels
+from .serializers import STATUS_ALL, FeedbackTableParamsSerializer, RatingLabelsSerializer
 
 
 class ResponseListView(APIView):
@@ -66,6 +67,12 @@ def surveys_with_questions():
 def survey_payload(survey):
     return {
         "name": survey.name,
+        # The scale in score order; `custom_labels` is false when the survey
+        # uses the defaults, so the UI can offer "reset to defaults".
+        "rating_scale": [
+            {"score": score, "label": label} for score, label in rating_labels(survey).items()
+        ],
+        "custom_labels": survey.rating_labels is not None,
         "questions": [
             {"id": q.id, "order": q.order, "text": q.text, "type": q.type}
             for q in survey.questions.all()
@@ -84,6 +91,31 @@ class SurveyListView(APIView):
         return ApiResponse(
             [{"id": survey.id, **survey_payload(survey)} for survey in surveys_with_questions()]
         )
+
+
+class SurveyRatingLabelsView(APIView):
+    """PUT {"labels": {"1": "Meh", ...}} to set a survey's labels, or null to reset.
+
+    The keys become the survey's scale. Existing answers are not touched: the
+    table resolves them against the new labels, and scores outside the new
+    scale show as legacy.
+    """
+
+    # Auth is out of scope (docs/PRD.md §3). Without this, a browser that is
+    # logged into /admin would send its session cookie and DRF would demand a
+    # CSRF token that the frontend has no way to obtain.
+    authentication_classes = []
+
+    def put(self, request, survey_id):
+        survey = get_object_or_404(Survey, pk=survey_id)
+        serializer = RatingLabelsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        survey.rating_labels = serializer.validated_data["labels"]
+        survey.save(update_fields=["rating_labels"])
+
+        survey = surveys_with_questions().get(pk=survey.pk)
+        return ApiResponse({"id": survey.id, **survey_payload(survey)})
 
 
 class FeedbackTablePagination(PageNumberPagination):
@@ -107,9 +139,13 @@ class FeedbackTableView(GenericAPIView):
 
         page = self.paginate_queryset(self._responses(params.validated_data))
         surveys = self._surveys({response.survey_id for response in page})
+        labels = {survey_id: rating_labels(survey) for survey_id, survey in surveys.items()}
 
         response = self.get_paginated_response(
-            [self._row(response, surveys[response.survey_id]) for response in page]
+            [
+                self._row(response, surveys[response.survey_id], labels[response.survey_id])
+                for response in page
+            ]
         )
         response.data["surveys"] = {
             str(survey.id): survey_payload(survey) for survey in surveys.values()
@@ -153,7 +189,7 @@ class FeedbackTableView(GenericAPIView):
     def _surveys(self, survey_ids):
         return {survey.id: survey for survey in surveys_with_questions().filter(id__in=survey_ids)}
 
-    def _row(self, response, survey):
+    def _row(self, response, survey, labels):
         values = {answer.question_id: answer.value for answer in response.answers.all()}
         return {
             "id": response.id,
@@ -171,7 +207,7 @@ class FeedbackTableView(GenericAPIView):
             ),
             "survey_id": response.survey_id,
             "answers": {
-                str(question.id): resolve_answer(question, values.get(question.id))
+                str(question.id): resolve_answer(question, values.get(question.id), labels)
                 for question in survey.questions.all()
             },
         }

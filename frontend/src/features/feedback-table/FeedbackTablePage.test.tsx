@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
-import { handlers, lastTableParams, page, row, server, tableRequests } from '../../test/server'
+import { handlers, labelUpdates, lastTableParams, page, row, server, SURVEYS, tableRequests } from '../../test/server'
 import { FeedbackTablePage } from './FeedbackTablePage'
 
 function renderPage(url = '/') {
@@ -248,6 +248,104 @@ describe('FeedbackTablePage', () => {
 
       await waitFor(() => expect(lastTableParams().get('page')).toBe('1'))
       await waitForRows()
+    })
+  })
+
+  describe('custom rating labels (Req 1)', () => {
+    function chips() {
+      const group = screen.getByRole('group', { name: 'Rating filter' })
+      return within(group)
+        .getAllByRole('button')
+        .map((button) => button.textContent)
+    }
+
+    it("offers the selected survey's scale as rating chips", async () => {
+      const { user } = renderPage()
+      await waitForRows()
+      expect(chips()).toEqual(['All ratings', '10', '9', '8', '7', '6', '5', '4', '3', '2', '1', '0'])
+
+      await user.selectOptions(screen.getByLabelText('Survey'), 'Post-Support CSAT')
+
+      expect(chips()).toEqual(['All ratings', '5', '4', '3', '2', '1'])
+    })
+
+    it('only offers label editing once a survey is selected', async () => {
+      const { user } = renderPage()
+      await waitForRows()
+      expect(screen.queryByRole('button', { name: 'Edit labels' })).not.toBeInTheDocument()
+
+      await user.selectOptions(screen.getByLabelText('Survey'), 'Post-Support CSAT')
+
+      expect(screen.getByRole('button', { name: 'Edit labels' })).toBeInTheDocument()
+    })
+
+    it('saves renamed labels and reloads the table with them', async () => {
+      const { user } = renderPage('/?survey=1')
+      await waitForRows()
+      const requestsBefore = tableRequests.length
+
+      await user.click(screen.getByRole('button', { name: 'Edit labels' }))
+      const form = screen.getByRole('form', { name: 'Rating labels: Post-Support CSAT' })
+      expect(within(form).getByLabelText('Label for score 5')).toHaveValue('Great')
+
+      const five = within(form).getByLabelText('Label for score 5')
+      await user.clear(five)
+      await user.type(five, 'Awesome')
+      await user.click(within(form).getByRole('button', { name: 'Save labels' }))
+
+      await waitFor(() => expect(screen.queryByRole('form')).not.toBeInTheDocument())
+      expect(labelUpdates).toEqual([
+        { surveyId: 1, labels: { '1': 'Terrible', '2': 'Bad', '3': 'Okay', '4': 'Good', '5': 'Awesome' } },
+      ])
+      // The table is fetched again so every answer shows the new wording.
+      await waitFor(() => expect(tableRequests.length).toBeGreaterThan(requestsBefore))
+    })
+
+    it('shows validation errors from the API and keeps the form open', async () => {
+      server.use(
+        handlers.updateLabels(() =>
+          HttpResponse.json({ labels: ['Each score needs a different label.'] }, { status: 400 }),
+        ),
+      )
+      const { user } = renderPage('/?survey=1')
+      await waitForRows()
+
+      await user.click(screen.getByRole('button', { name: 'Edit labels' }))
+      await user.click(screen.getByRole('button', { name: 'Save labels' }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Each score needs a different label.')
+      expect(screen.getByRole('form')).toBeInTheDocument()
+    })
+
+    it('resets custom labels to the defaults', async () => {
+      const { user } = renderPage('/?survey=2')
+      await waitForRows()
+
+      await user.click(screen.getByRole('button', { name: 'Edit labels' }))
+      await user.click(screen.getByRole('button', { name: 'Reset to default labels' }))
+
+      await waitFor(() => expect(labelUpdates).toEqual([{ surveyId: 2, labels: null }]))
+    })
+
+    it('does not offer a reset for a survey on the defaults', async () => {
+      const { user } = renderPage('/?survey=1')
+      await waitForRows()
+
+      await user.click(screen.getByRole('button', { name: 'Edit labels' }))
+
+      expect(screen.queryByRole('button', { name: 'Reset to default labels' })).not.toBeInTheDocument()
+      expect(SURVEYS[0].custom_labels).toBe(false)
+    })
+
+    it('cancel closes the editor without saving', async () => {
+      const { user } = renderPage('/?survey=1')
+      await waitForRows()
+
+      await user.click(screen.getByRole('button', { name: 'Edit labels' }))
+      await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      expect(screen.queryByRole('form')).not.toBeInTheDocument()
+      expect(labelUpdates).toEqual([])
     })
   })
 })

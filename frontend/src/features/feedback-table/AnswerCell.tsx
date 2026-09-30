@@ -1,16 +1,12 @@
 import type { AnswerCell as AnswerCellData, Question } from '../../api/types'
-
-function badgeTone(value: string | null): 'green' | 'amber' | 'red' {
-  const score = Number(value)
-  if (score >= 4) return 'green'
-  if (score === 3) return 'amber'
-  return 'red'
-}
+import { toneFor } from './scales'
 
 interface Props {
   /** The survey's question at this column, or undefined when it has none. */
   question: Question | undefined
   answer: AnswerCellData | undefined
+  /** The scores of the row's survey, for colouring the badge. */
+  scale: number[]
   /** Repeat the question text in the cell when the header cannot show it. */
   showQuestionText: boolean
 }
@@ -19,7 +15,7 @@ interface Props {
  * One answer, styled from the backend's resolved `state` (docs/PRD.md §6).
  * The frontend never re-interprets the raw value.
  */
-export function AnswerCell({ question, answer, showQuestionText }: Props) {
+export function AnswerCell({ question, answer, scale, showQuestionText }: Props) {
   // The survey has no question at this position: nothing to answer.
   if (!question || !answer) return <td className="qcell" data-state="not_applicable" />
 
@@ -31,16 +27,16 @@ export function AnswerCell({ question, answer, showQuestionText }: Props) {
           <span className="qtype">{question.type}</span>
         </span>
       )}
-      <AnswerValue answer={answer} />
+      <AnswerValue answer={answer} scale={scale} />
     </td>
   )
 }
 
-function AnswerValue({ answer }: { answer: AnswerCellData }) {
+function AnswerValue({ answer, scale }: { answer: AnswerCellData; scale: number[] }) {
   switch (answer.state) {
     case 'ok':
       return (
-        <span className={`badge ${badgeTone(answer.value)}`}>
+        <span className={`badge ${toneFor(answer.value, scale)}`}>
           {answer.value} · {answer.display}
         </span>
       )

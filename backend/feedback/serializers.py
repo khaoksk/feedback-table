@@ -1,4 +1,7 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
+
+from .scales import normalize_rating_labels
 
 STATUS_ALL = "all"
 
@@ -26,3 +29,17 @@ class FeedbackTableParamsSerializer(serializers.Serializer):
                 "rating and rating_question must be given together."
             )
         return attrs
+
+
+class RatingLabelsSerializer(serializers.Serializer):
+    """Body of PUT /api/surveys/<id>/rating-labels/."""
+
+    labels = serializers.JSONField(allow_null=True)
+
+    def validate_labels(self, value):
+        if value is None:
+            return None
+        try:
+            return normalize_rating_labels(value)
+        except DjangoValidationError as error:
+            raise serializers.ValidationError(error.messages)

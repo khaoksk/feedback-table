@@ -6,8 +6,8 @@ returned as its raw `value`, a human `display` string and a `state` the
 frontend styles on (see docs/PRD.md §6).
 """
 from .models import Question
+from .scales import DEFAULT_RATING_LABELS
 
-DEFAULT_RATING_LABELS = {1: "Terrible", 2: "Bad", 3: "Okay", 4: "Good", 5: "Great"}
 LEGACY_RATING_LABEL = "Unrated"
 
 OK = "ok"
@@ -16,12 +16,17 @@ INVALID = "invalid"
 UNANSWERED = "unanswered"
 
 
-def resolve_answer(question, value):
-    """Resolve one question's answer; `value` is None when it was not answered."""
+def resolve_answer(question, value, rating_labels=DEFAULT_RATING_LABELS):
+    """Resolve one question's answer; `value` is None when it was not answered.
+
+    `rating_labels` is the survey's current {score: label} map
+    (scales.rating_labels), so renamed labels and changed scales show up
+    immediately for every existing answer.
+    """
     if value is None:
         return _cell(None, None, UNANSWERED)
     if question.type == Question.RATING:
-        return _resolve_rating(value, DEFAULT_RATING_LABELS)
+        return _resolve_rating(value, rating_labels)
     return _cell(value, value, OK)
 
 

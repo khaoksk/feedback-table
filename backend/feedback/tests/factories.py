@@ -61,3 +61,13 @@ class AnswerFactory(DjangoModelFactory):
         QuestionFactory, survey=factory.SelfAttribute("..response.survey")
     )
     value = "4"
+
+
+# The payload shape of the default Terrible...Great scale (views.survey_payload).
+DEFAULT_SCALE = [
+    {"score": 1, "label": "Terrible"},
+    {"score": 2, "label": "Bad"},
+    {"score": 3, "label": "Okay"},
+    {"score": 4, "label": "Good"},
+    {"score": 5, "label": "Great"},
+]
