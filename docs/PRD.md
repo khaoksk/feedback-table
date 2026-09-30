@@ -75,7 +75,7 @@ The brief says to extend the backend, not replace it; the legacy endpoint and pa
 **Pagination:** page number (DRF `PageNumberPagination`), default 50 per page.
 
 - At 10K rows `OFFSET` costs milliseconds; it gives the "Showing X of Y responses" count the design shows and allows jumping to any page
-- Deterministic order: `submitted_at DESC, id DESC`; index on `(submitted_at, id)` and on `status`
+- Deterministic order: `submitted_at DESC, id DESC`; indexes on `(submitted_at, id)` and `(status, submitted_at, id)`
 - `next` / `previous` are URLs, so a later move to cursor pagination needs minimal frontend change
 
 **Response shape:**
@@ -138,7 +138,7 @@ the same validator explicitly.
 | PR | Change | Why |
 |---|---|---|
 | Baseline | `Answer`: unique `(response, question)`, `created_at`, `updated_at` | Blocks duplicate answers before bulk data is generated. The seed has 0 duplicates; the migration fails with a clear message if any exist. Existing rows are backfilled from `Response.submitted_at`. |
-| Baseline | Indexes on `Response (submitted_at, id)` and `status` | Sorting and filtering at 10K+ |
+| Baseline | Indexes on `Response (submitted_at, id)` and `(status, submitted_at, id)` | Page through newest first without a sort step, with or without the status filter. A `status`-only index would go unused: two values, ~78% `completed`. |
 | Req 1 | Per-survey rating labels | Storage (JSON field vs table) decided in the Req 1 PR |
 | Req 2 | Question options | Storage of multi-select values decided in the Req 2 PR |
 | Req 4 | `AnswerRevision` (previous value + timestamp); `Answer` keeps the current value | Table reads one row per question (fast); full history; the design needs the original value and date. Revision and update are written in one transaction. |
