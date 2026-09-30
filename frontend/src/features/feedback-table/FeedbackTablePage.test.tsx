@@ -460,4 +460,24 @@ describe('FeedbackTablePage', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent('Each option needs a different label.')
     })
   })
+
+  describe('comment questions (Req 3)', () => {
+    it('creates a comment question without options', async () => {
+      const result = renderPage('/?survey=1')
+      await waitForRows()
+      await result.user.click(screen.getByRole('button', { name: 'Add question' }))
+      const form = screen.getByRole('form', { name: 'Add a question to Post-Support CSAT' })
+
+      await result.user.type(within(form).getByLabelText('Question'), 'Anything you would add?')
+      await result.user.click(within(form).getByLabelText(/^Comment/))
+      expect(within(form).queryByLabelText('Option 1')).not.toBeInTheDocument()
+      await result.user.click(within(form).getByRole('button', { name: 'Add question' }))
+
+      await waitFor(() =>
+        expect(createdQuestions).toEqual([
+          { surveyId: 1, body: { text: 'Anything you would add?', type: 'comment', options: [] } },
+        ]),
+      )
+    })
+  })
 })

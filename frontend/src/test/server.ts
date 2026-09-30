@@ -57,6 +57,7 @@ export const SURVEYS: Survey[] = [
           { id: 303, label: 'Kickoff call', order: 3 },
         ],
       },
+      { id: 33, order: 3, text: 'Anything you would add?', type: 'comment', options: [] },
     ],
   },
 ]

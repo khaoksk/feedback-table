@@ -4,7 +4,9 @@ import { useState, type FormEvent } from 'react'
 import { ApiError, fetchSurveys, submitResponse } from '../../api/client'
 import type { Question, Survey } from '../../api/types'
 
-type Answers = Record<string, number | number[]>
+type Answers = Record<string, number | number[] | string>
+
+export const MAX_COMMENT_LENGTH = 2000
 
 /**
  * A respondent answers one survey: ratings on the survey's own scale, and
@@ -96,9 +98,14 @@ function ResponseForm({ survey, onSubmitted }: { survey: Survey; onSubmitted: (i
         ? ["Couldn't send your response. Try again."]
         : []
 
-  function setAnswer(question: Question, value: number | number[] | null) {
+  function setAnswer(question: Question, value: number | number[] | string | null) {
     const next = { ...answers }
-    if (value === null || (Array.isArray(value) && value.length === 0)) delete next[String(question.id)]
+    // An emptied answer counts as skipped: no ticks, or only whitespace typed.
+    const empty =
+      value === null ||
+      (Array.isArray(value) && value.length === 0) ||
+      (typeof value === 'string' && value.trim() === '')
+    if (empty) delete next[String(question.id)]
     else next[String(question.id)] = value
     setAnswers(next)
   }
@@ -133,6 +140,12 @@ function ResponseForm({ survey, onSubmitted }: { survey: Survey; onSubmitted: (i
               question={question}
               survey={survey}
               value={answers[String(question.id)] as number | undefined}
+              onChange={(value) => setAnswer(question, value)}
+            />
+          ) : question.type === 'comment' ? (
+            <CommentInput
+              question={question}
+              value={(answers[String(question.id)] as string | undefined) ?? ''}
               onChange={(value) => setAnswer(question, value)}
             />
           ) : (
@@ -193,6 +206,33 @@ function RatingInput({
           Clear
         </button>
       )}
+    </div>
+  )
+}
+
+function CommentInput({
+  question,
+  value,
+  onChange,
+}: {
+  question: Question
+  value: string
+  onChange: (value: string) => void
+}) {
+  const counterId = `q${question.id}-count`
+  return (
+    <div className="comment-input">
+      <textarea
+        aria-label={question.text}
+        aria-describedby={counterId}
+        rows={4}
+        maxLength={MAX_COMMENT_LENGTH}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <span id={counterId} className="hint">
+        {value.length.toLocaleString()} / {MAX_COMMENT_LENGTH.toLocaleString()}
+      </span>
     </div>
   )
 }
