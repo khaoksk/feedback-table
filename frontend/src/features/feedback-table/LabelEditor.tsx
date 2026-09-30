@@ -9,15 +9,30 @@ interface Props {
   onClose: () => void
 }
 
+const LOWEST_SCORES = [0, 1]
+const HIGHEST_SCORES = [3, 4, 5, 6, 7, 8, 9, 10]
+
+function range(low: number, high: number): number[] {
+  return Array.from({ length: high - low + 1 }, (_, i) => low + i)
+}
+
 /**
- * Rename the labels of a survey's rating scale. The table resolves every
- * existing answer against the new labels, so nothing else needs updating.
+ * Rename the labels of a survey's rating scale, or change its range (Req 5).
+ * The table resolves every existing answer against the new labels; scores
+ * outside a new range show as legacy. Nothing stored is rewritten.
  */
 export function LabelEditor({ survey, onClose }: Props) {
   const queryClient = useQueryClient()
-  const [labels, setLabels] = useState(() =>
+  const current = survey.rating_scale.map((point) => point.score)
+  const [low, setLow] = useState(Math.min(...current))
+  const [high, setHigh] = useState(Math.max(...current))
+  // Every label typed so far, including scores outside the range, so narrowing
+  // and widening again does not lose them.
+  const [labels, setLabels] = useState<Record<string, string>>(() =>
     Object.fromEntries(survey.rating_scale.map((point) => [String(point.score), point.label])),
   )
+  const scores = range(low, high)
+  const dropped = current.filter((score) => score < low || score > high)
 
   const save = useMutation({
     mutationFn: (next: Record<string, string> | null) => updateRatingLabels(survey.id, next),
@@ -40,7 +55,7 @@ export function LabelEditor({ survey, onClose }: Props) {
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    save.mutate(labels)
+    save.mutate(Object.fromEntries(scores.map((score) => [String(score), labels[String(score)] ?? String(score)])))
   }
 
   return (
@@ -51,19 +66,44 @@ export function LabelEditor({ survey, onClose }: Props) {
         {survey.custom_labels ? '' : ' This survey currently uses the default labels.'}
       </p>
 
+      <div className="scale-range">
+        <label htmlFor="scale-low">Scale from</label>
+        <select id="scale-low" aria-label="Lowest score" value={low} onChange={(e) => setLow(Number(e.target.value))}>
+          {LOWEST_SCORES.map((score) => (
+            <option key={score} value={score}>
+              {score}
+            </option>
+          ))}
+        </select>
+        <label htmlFor="scale-high">to</label>
+        <select id="scale-high" aria-label="Highest score" value={high} onChange={(e) => setHigh(Number(e.target.value))}>
+          {HIGHEST_SCORES.map((score) => (
+            <option key={score} value={score}>
+              {score}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="label-fields">
-        {survey.rating_scale.map((point) => (
-          <label key={point.score} className="label-field">
-            <span className="score">{point.score}</span>
+        {scores.map((score) => (
+          <label key={score} className="label-field">
+            <span className="score">{score}</span>
             <input
-              value={labels[String(point.score)] ?? ''}
+              value={labels[String(score)] ?? String(score)}
               maxLength={40}
-              aria-label={`Label for score ${point.score}`}
-              onChange={(event) => setLabels({ ...labels, [String(point.score)]: event.target.value })}
+              aria-label={`Label for score ${score}`}
+              onChange={(event) => setLabels({ ...labels, [String(score)]: event.target.value })}
             />
           </label>
         ))}
       </div>
+
+      {dropped.length > 0 && (
+        <p className="hint" role="note">
+          Existing answers with score {dropped.join(', ')} will show as legacy (Unrated). They are not changed.
+        </p>
+      )}
 
       {errors.length > 0 && (
         <ul className="error" role="alert">

@@ -8,6 +8,7 @@ import { ratingQuestionOptions, refine, toApiParams, withSurvey } from './filter
 import { LabelEditor } from './LabelEditor'
 import { Pagination } from './Pagination'
 import { QuestionForm } from './QuestionForm'
+import { QuestionsPanel } from './QuestionsPanel'
 import { ratingScores } from './scales'
 import { Toolbar } from './Toolbar'
 import { useUrlFilters } from './useUrlFilters'
@@ -31,7 +32,7 @@ export function FeedbackTablePage() {
   const ratingOptions = ratingQuestionOptions(surveys, filters.survey, allColumns)
   const scores = ratingScores(selectedSurvey ? [selectedSurvey] : surveys)
   // At most one settings panel is open at a time.
-  const [panel, setPanel] = useState<'labels' | 'question' | null>(null)
+  const [panel, setPanel] = useState<'labels' | 'question' | 'questions' | null>(null)
 
   const apiParams = toApiParams(filters)
   const tableQuery = useQuery({
@@ -73,6 +74,7 @@ export function FeedbackTablePage() {
         ratingScores={scores}
         onEditLabels={() => setPanel('labels')}
         onAddQuestion={() => setPanel('question')}
+        onEditQuestions={() => setPanel('questions')}
         onSearchText={setSearchDraft}
         onSurvey={(surveyId) => setFilters(withSurvey(filters, surveyId, surveys, allColumns))}
         onRating={(rating) =>
@@ -90,6 +92,9 @@ export function FeedbackTablePage() {
       )}
       {panel === 'question' && selectedSurvey && (
         <QuestionForm key={selectedSurvey.id} survey={selectedSurvey} onClose={() => setPanel(null)} />
+      )}
+      {panel === 'questions' && selectedSurvey && (
+        <QuestionsPanel key={selectedSurvey.id} survey={selectedSurvey} onClose={() => setPanel(null)} />
       )}
 
       <p className="count" aria-live="polite">

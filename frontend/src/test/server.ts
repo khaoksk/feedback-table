@@ -94,6 +94,10 @@ export const submittedResponses: { surveyId: number; body: unknown }[] = []
 /** PUT /api/responses/<id>/edit/ requests seen during a test. */
 export const responseUpdates: { responseId: number; token: string | null; body: unknown }[] = []
 
+/** DELETE /api/questions/<id>/ and PUT .../options/ requests seen during a test. */
+export const archivedQuestions: number[] = []
+export const optionUpdates: { questionId: number; body: unknown }[] = []
+
 export const EDIT_TOKEN = 'tok-123'
 
 /** A saved response to Onboarding CSAT, as its edit link returns it. */
@@ -137,6 +141,18 @@ export const handlers = {
       responseUpdates.push({ responseId: Number(params.id), token, body: await request.json() })
       return respond ? respond() : HttpResponse.json({ id: Number(params.id), changed: 1 })
     }),
+  archivedQuestions: (list: unknown[] = []) =>
+    http.get('*/api/surveys/:id/archived-questions/', () => HttpResponse.json(list)),
+  archiveQuestion: (respond?: () => Response) =>
+    http.delete('*/api/questions/:id/', ({ params }) => {
+      archivedQuestions.push(Number(params.id))
+      return respond ? respond() : new HttpResponse(null, { status: 204 })
+    }),
+  updateOptions: (respond?: () => Response) =>
+    http.put('*/api/questions/:id/options/', async ({ params, request }) => {
+      optionUpdates.push({ questionId: Number(params.id), body: await request.json() })
+      return respond ? respond() : HttpResponse.json({ id: Number(params.id), order: 2, text: 'x', type: 'multiselect', options: [] })
+    }),
   updateLabels: (respond?: (surveyId: number) => Response) =>
     http.put('*/api/surveys/:id/rating-labels/', async ({ params, request }) => {
       const surveyId = Number(params.id)
@@ -162,6 +178,9 @@ export const server = setupServer(
   handlers.submitResponse(),
   handlers.editResponse(),
   handlers.updateResponse(),
+  handlers.archivedQuestions(),
+  handlers.archiveQuestion(),
+  handlers.updateOptions(),
 )
 
 export function lastTableParams(): URLSearchParams {
@@ -176,4 +195,6 @@ export function resetTableRequests() {
   createdQuestions.length = 0
   submittedResponses.length = 0
   responseUpdates.length = 0
+  archivedQuestions.length = 0
+  optionUpdates.length = 0
 }

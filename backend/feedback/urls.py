@@ -13,6 +13,13 @@ urlpatterns = [
         name="survey_rating_labels",
     ),
     path("api/surveys/<int:survey_id>/questions/", views.SurveyQuestionsView.as_view(), name="survey_questions"),
+    path(
+        "api/surveys/<int:survey_id>/archived-questions/",
+        views.SurveyArchivedQuestionsView.as_view(),
+        name="survey_archived_questions",
+    ),
     path("api/surveys/<int:survey_id>/responses/", views.SurveyResponsesView.as_view(), name="survey_responses"),
     path("api/responses/<int:response_id>/edit/", views.ResponseEditView.as_view(), name="response_edit"),
+    path("api/questions/<int:question_id>/", views.QuestionView.as_view(), name="question"),
+    path("api/questions/<int:question_id>/options/", views.QuestionOptionsView.as_view(), name="question_options"),
 ]

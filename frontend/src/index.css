@@ -670,3 +670,83 @@ tbody tr:hover {
   font-size: 12.5px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+
+/* Editing questions and options (Req 5) */
+.question-list {
+  margin: 0 0 12px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.question-list > li {
+  padding: 8px 0;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.question-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.question-row .question-text {
+  flex: 1 1 320px;
+}
+
+.link-button.danger {
+  color: var(--red-text);
+}
+
+.error.inline {
+  padding: 2px 8px;
+  margin: 0;
+}
+
+.options-editor {
+  margin: 10px 0 4px 16px;
+}
+
+.options-editor input {
+  width: 220px;
+  height: 30px;
+  border: 0.5px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+
+.scale-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.scale-range select {
+  height: 30px;
+  border: 0.5px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 0 6px;
+}
+
+.archived-questions {
+  margin: 4px 0 12px;
+}
+
+.archived-questions h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.archived-questions ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}

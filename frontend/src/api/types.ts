@@ -62,6 +62,15 @@ export interface Survey {
   questions: Question[]
 }
 
+/** A question removed from its survey; its answers are kept (Req 5). */
+export interface ArchivedQuestion {
+  id: number
+  text: string
+  type: QuestionType
+  archived_at: string
+  answer_count: number
+}
+
 export type ResponseStatus = 'completed' | 'draft'
 
 export interface FeedbackRow {

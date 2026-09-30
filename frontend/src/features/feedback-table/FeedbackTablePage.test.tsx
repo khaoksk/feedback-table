@@ -1,14 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { HttpResponse } from 'msw'
+import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 
 import {
+  archivedQuestions,
   createdQuestions,
   handlers,
   labelUpdates,
   lastTableParams,
+  optionUpdates,
   page,
   row,
   server,
@@ -511,6 +513,186 @@ describe('FeedbackTablePage', () => {
       const q1 = within(first).getAllByRole('cell')[5]
       expect(within(q1).getByText('edited')).toHaveAttribute('title', 'Originally 2 · Bad on 2026-06-20 · edited once')
       expect(within(within(first).getAllByRole('cell')[6]).queryByText('edited')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('current settings (Req 5)', () => {
+    async function openQuestions(url = '/?survey=3') {
+      const result = renderPage(url)
+      await waitForRows()
+      await result.user.click(screen.getByRole('button', { name: 'Edit questions' }))
+      return { ...result, panel: screen.getByRole('region', { name: /^Questions of/ }) }
+    }
+
+    it('lists the survey questions with their types', async () => {
+      const { panel } = await openQuestions()
+
+      const items = within(panel).getAllByRole('listitem').map((li) => li.textContent)
+      expect(items[0]).toMatch(/^Q1\. How easy was it to get started\? Rating/)
+      expect(items[1]).toMatch(/^Q2\. What made the biggest difference\? Multi-select/)
+    })
+
+    it('archives a question only after confirming, then reloads', async () => {
+      const { user, panel } = await openQuestions()
+      const requestsBefore = tableRequests.length
+      const q1 = within(panel).getAllByRole('listitem')[0]
+
+      await user.click(within(q1).getByRole('button', { name: 'Archive' }))
+      expect(archivedQuestions).toEqual([])
+      await user.click(within(q1).getByRole('button', { name: 'Confirm archive of Q1' }))
+
+      await waitFor(() => expect(archivedQuestions).toEqual([31]))
+      await waitFor(() => expect(tableRequests.length).toBeGreaterThan(requestsBefore))
+    })
+
+    it('can back out of archiving', async () => {
+      const { user, panel } = await openQuestions()
+      const q1 = within(panel).getAllByRole('listitem')[0]
+
+      await user.click(within(q1).getByRole('button', { name: 'Archive' }))
+      await user.click(within(q1).getByRole('button', { name: 'Keep it' }))
+
+      expect(within(q1).getByRole('button', { name: 'Archive' })).toBeInTheDocument()
+      expect(archivedQuestions).toEqual([])
+    })
+
+    it('shows why a question could not be archived', async () => {
+      server.use(
+        handlers.archiveQuestion(() =>
+          HttpResponse.json({ question: ['A survey needs at least one question.'] }, { status: 400 }),
+        ),
+      )
+      const { user, panel } = await openQuestions()
+      const q1 = within(panel).getAllByRole('listitem')[0]
+
+      await user.click(within(q1).getByRole('button', { name: 'Archive' }))
+      await user.click(within(q1).getByRole('button', { name: 'Confirm archive of Q1' }))
+
+      expect(await within(q1).findByRole('alert')).toHaveTextContent('A survey needs at least one question.')
+    })
+
+    it('renames, reorders, removes and adds options in one save', async () => {
+      const { user, panel } = await openQuestions()
+      const q2 = within(panel).getAllByRole('listitem')[1]
+      await user.click(within(q2).getByRole('button', { name: 'Edit options' }))
+      const form = within(q2).getByRole('form', { name: 'Options of Q2' })
+
+      const docs = within(form).getByLabelText('Option 1')
+      await user.clear(docs)
+      await user.type(docs, 'Documentation')
+      // Kickoff call moves up to 2, so Support team is now option 3.
+      await user.click(within(form).getByRole('button', { name: 'Move option 3 up' }))
+      await user.click(within(form).getByRole('button', { name: 'Remove option 3' }))
+      expect(within(form).getByText(/Will be removed \(kept on old answers\): Support team/)).toBeInTheDocument()
+      await user.click(within(form).getByRole('button', { name: '+ Add option' }))
+      await user.type(within(form).getByLabelText('Option 3'), 'Onboarding call')
+      await user.click(within(form).getByRole('button', { name: 'Save options' }))
+
+      await waitFor(() =>
+        expect(optionUpdates).toEqual([
+          {
+            questionId: 32,
+            body: {
+              options: [
+                { id: 301, label: 'Documentation' },
+                { id: 303, label: 'Kickoff call' },
+                { label: 'Onboarding call' },
+              ],
+            },
+          },
+        ]),
+      )
+    })
+
+    it('keeps at least two options', async () => {
+      const { user, panel } = await openQuestions()
+      const q2 = within(panel).getAllByRole('listitem')[1]
+      await user.click(within(q2).getByRole('button', { name: 'Edit options' }))
+      const form = within(q2).getByRole('form', { name: 'Options of Q2' })
+
+      await user.click(within(form).getByRole('button', { name: 'Remove option 1' }))
+
+      expect(within(form).queryByRole('button', { name: /Remove option/ })).not.toBeInTheDocument()
+    })
+
+    it('narrows the scale and warns which scores become legacy', async () => {
+      const { user } = renderPage('/?survey=1')
+      await waitForRows()
+      await user.click(screen.getByRole('button', { name: 'Edit labels' }))
+      const form = screen.getByRole('form', { name: 'Rating labels: Post-Support CSAT' })
+
+      await user.selectOptions(within(form).getByLabelText('Highest score'), '3')
+
+      expect(within(form).queryByLabelText('Label for score 4')).not.toBeInTheDocument()
+      expect(within(form).getByRole('note')).toHaveTextContent('score 4, 5 will show as legacy')
+      await user.click(within(form).getByRole('button', { name: 'Save labels' }))
+      await waitFor(() =>
+        expect(labelUpdates).toEqual([{ surveyId: 1, labels: { '1': 'Terrible', '2': 'Bad', '3': 'Okay' } }]),
+      )
+    })
+
+    it('widens the scale to 0-10, prefilling new scores', async () => {
+      const { user } = renderPage('/?survey=1')
+      await waitForRows()
+      await user.click(screen.getByRole('button', { name: 'Edit labels' }))
+      const form = screen.getByRole('form', { name: 'Rating labels: Post-Support CSAT' })
+
+      await user.selectOptions(within(form).getByLabelText('Lowest score'), '0')
+      await user.selectOptions(within(form).getByLabelText('Highest score'), '10')
+
+      expect(within(form).getByLabelText('Label for score 0')).toHaveValue('0')
+      expect(within(form).getByLabelText('Label for score 5')).toHaveValue('Great')
+      expect(within(form).getByLabelText('Label for score 10')).toHaveValue('10')
+    })
+  })
+
+  describe('archived questions (Req 5)', () => {
+    it('lists archived questions with their date and kept answers', async () => {
+      server.use(
+        handlers.archivedQuestions([
+          { id: 2, text: 'How friendly was the agent?', type: 'rating', archived_at: '2026-08-16T00:00:00Z', answer_count: 4742 },
+        ]),
+      )
+      const { user } = renderPage('/?survey=1')
+      await waitForRows()
+      await user.click(screen.getByRole('button', { name: 'Edit questions' }))
+
+      const section = await screen.findByRole('region', { name: 'Archived questions' })
+      expect(await within(section).findByText('How friendly was the agent?')).toBeInTheDocument()
+      expect(section).toHaveTextContent('archived 2026-08-16 · 4,742 answers kept')
+    })
+
+    it('says when nothing is archived', async () => {
+      const { user } = renderPage('/?survey=1')
+      await waitForRows()
+      await user.click(screen.getByRole('button', { name: 'Edit questions' }))
+
+      const section = await screen.findByRole('region', { name: 'Archived questions' })
+      expect(await within(section).findByText(/None\. Every question/)).toBeInTheDocument()
+    })
+
+    it('shows a question in the archived list right after archiving it', async () => {
+      let archivedList: unknown[] = []
+      server.use(
+        http.get('*/api/surveys/:id/archived-questions/', () => HttpResponse.json(archivedList)),
+        handlers.archiveQuestion(() => {
+          archivedList = [
+            { id: 31, text: 'How easy was it to get started?', type: 'rating', archived_at: '2026-10-01T09:00:00Z', answer_count: 12 },
+          ]
+          return new HttpResponse(null, { status: 204 })
+        }),
+      )
+      const { user } = renderPage('/?survey=3')
+      await waitForRows()
+      await user.click(screen.getByRole('button', { name: 'Edit questions' }))
+      const panel = screen.getByRole('region', { name: /^Questions of/ })
+      const q1 = within(panel).getAllByRole('listitem')[0]
+
+      await user.click(within(q1).getByRole('button', { name: 'Archive' }))
+      await user.click(within(q1).getByRole('button', { name: 'Confirm archive of Q1' }))
+
+      const section = screen.getByRole('region', { name: 'Archived questions' })
+      expect(await within(section).findByText('How easy was it to get started?')).toBeInTheDocument()
     })
   })
 })
