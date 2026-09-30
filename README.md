@@ -73,7 +73,7 @@ also has the subtitles (`.vtt`) and chapter times.
 | 0:01 | The problem: the legacy API against the paged table |
 | 0:31 | Table & filters |
 | 1:38 | The six requirements |
-| 4:58 | How it was built: PRs, commits, this AI collaboration note, CI |
+| 4:58 | How it was built: PRs, commits, the AI collaboration note, CI |
 
 **Re-record:** [demo/](demo/README.md) records the end-to-end demo with Playwright, with on-screen captions and highlights at each
 step, plus subtitles and chapter marks: `cd demo && npm install && npm run record:app`.
