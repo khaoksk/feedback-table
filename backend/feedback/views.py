@@ -303,7 +303,11 @@ class FeedbackTableView(GenericAPIView):
             queryset = queryset.filter(
                 Exists(
                     Answer.objects.filter(
-                        response=OuterRef("pk"), value=str(params["rating"]), **question
+                        response=OuterRef("pk"),
+                        value=str(params["rating"]),
+                        # Only ratings: a comment of "5" is text, not a score.
+                        question__type=Question.RATING,
+                        **question,
                     )
                 )
             )

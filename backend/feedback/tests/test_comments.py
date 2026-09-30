@@ -159,3 +159,14 @@ class TestCommentApi:
         cell = client.get("/api/feedback-table/").json()["results"][0]["answers"][str(note.id)]
         assert cell["display"] == text.strip()
 
+
+@pytest.mark.django_db
+def test_comment_answers_do_not_match_the_rating_filter():
+    survey = SurveyFactory()
+    note = QuestionFactory(survey=survey, order=1, type=Question.COMMENT)
+    response = ResponseFactory(survey=survey)
+    Answer.objects.create(response=response, question=note, value="5")
+
+    data = APIClient().get("/api/feedback-table/", {"rating": 5, "rating_question": 1}).json()
+
+    assert data["count"] == 0
